@@ -1,0 +1,5 @@
+{
+  "name": "Stalcraft Player Stats",
+  "description": "View detailed player statistics from Stalcraft using the EXBO API.",
+  "requestFramePermissions": []
+}
