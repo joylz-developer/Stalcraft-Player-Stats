@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Игнорировать базы данных
+*.db
+*.sqlite
+*.sqlite-journal
