@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, User, Shield, Crosshair, Activity, AlertCircle, MapPin, Loader2, 
   Target, Skull, Coins, Map, Swords, Home, Trophy, Percent, Clock, Calendar,
-  Settings, LogOut, Plus, Trash2, Save
+  Settings, LogOut, Plus, Trash2, Save, ChevronUp, ChevronDown
 } from 'lucide-react';
 import axios from 'axios';
 import { clsx, type ClassValue } from 'clsx';
@@ -17,6 +17,11 @@ if (savedToken) {
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+export const ICON_MAP: Record<string, any> = {
+  Activity, Crosshair, Target, Skull, Coins, AlertCircle, Map, Swords, Home, MapPin,
+  Search, User, Shield, Loader2, Trophy, Percent, Clock, Calendar, Settings, LogOut, Plus, Trash2, Save
+};
 
 type Region = 'eu' | 'ru' | 'na' | 'sea';
 
@@ -47,7 +52,22 @@ interface HighlightConfig {
   title: string;
   formula: string;
   color: string;
-  format: 'number' | 'percent' | 'ratio' | 'duration';
+  format: 'number' | 'percent' | 'ratio' | 'duration' | 'duration_hours';
+}
+
+export interface StatItemConfig {
+  id: string;
+  title: string;
+  formula: string;
+  format: 'auto' | 'number' | 'percent' | 'ratio' | 'duration' | 'duration_hours' | 'date' | 'distance';
+  isHidden: boolean;
+}
+
+export interface StatGroupConfig {
+  id: string;
+  title: string;
+  icon: string;
+  items: StatItemConfig[];
 }
 
 const ALLIANCE_MAP: Record<string, { name: string, color: string, bg: string }> = {
@@ -155,17 +175,17 @@ const STAT_NAMES: Record<string, string> = {
   "cha-mes-sen": "Сообщений в чат"
 };
 
-const STAT_GROUPS = [
-  { title: 'Общая статистика', icon: Activity, keys: ['pla-tim', 'reg-tim', 'ach-points', 'ach-gai', 'que-fin', 'sgn-fnd', 'art-col', 'cha-mes-sen'] },
-  { title: 'Боевая эффективность (PvP)', icon: Crosshair, keys: ['kil', 'dea', 'ast', 'max-kil-ser', 'kni-kil', 'exp-kil', 'dam-dea-pla', 'dam-rec-pla'] },
-  { title: 'Оружие и Точность', icon: Target, keys: ['sho-fir', 'sho-hit', 'sho-hea', 'sho-bod', 'sho-lim', 'gre-thr', 'scr-thr', 'wea-fix', 'arm-fix'] },
-  { title: 'Охота на мутантов', icon: Skull, keys: ['mut-kil', 'mut-boar-kil', 'mut-flsh-kil', 'mut-dog-kil', 'mut-pse-kil', 'mut-tush-kil', 'mut-krv-kil', 'mut-psi-kil', 'mut-chi-kill', 'mut-gig-kil', 'mut-elp-kil'] },
-  { title: 'Экономика и Торговля', icon: Coins, keys: ['max-mon-amo', 'tra', 'ite-bou-tra', 'ite-sol-tra', 'mon-gai-tra', 'mon-gai-que', 'equ-upg', 'suc-equ-upg'] },
-  { title: 'Выживание и Смерти', icon: AlertCircle, keys: ['suicides', 'ano-dea', 'bul-dea', 'ble-to-dea', 'rad-dea', 'fal-dea', 'col-dea', 'ste-ano-dea', 'ele-ano-dea', 'fun-ano-dea', 'cir-ano-dea', 'tra-ano-dea', 'lig-ano-dea'] },
-  { title: 'Активности', icon: Map, keys: ['tpacks-delivered', 'tpacks-money', 'tpacks-distance', 'tpacks-inter', 'air-drops-hckd', 'hid-plc', 'mining-count', 'incident-part', 'incident-win', 'completed-ops', 'kills-ops'] },
-  { title: 'Сессионные бои и Дуэли', icon: Swords, keys: ['part-bf', 'won-bf', 'lost-bf', 'kills-bf', 'deaths-bf', 'fights-part', 'won-fights-personal', 'won-fights-equal'] },
-  { title: 'Убежище', icon: Home, keys: ['hid-ktch-crft', 'hid-wrk-crft', 'hid-lab-crft', 'hid-mat-mon', 'hid-enrg'] },
-  { title: 'Перемещение', icon: MapPin, keys: ['dis-on-foo', 'dis-sne', 'dis-cra', 'dis-air'] }
+export const DEFAULT_STATS_CONFIG: StatGroupConfig[] = [
+  { id: 'g_1', title: 'Общая статистика', icon: 'Activity', items: ['pla-tim', 'reg-tim', 'ach-points', 'ach-gai', 'que-fin', 'sgn-fnd', 'art-col', 'cha-mes-sen'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_2', title: 'Боевая эффективность (PvP)', icon: 'Crosshair', items: ['kil', 'dea', 'ast', 'max-kil-ser', 'kni-kil', 'exp-kil', 'dam-dea-pla', 'dam-rec-pla'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_3', title: 'Оружие и Точность', icon: 'Target', items: ['sho-fir', 'sho-hit', 'sho-hea', 'sho-bod', 'sho-lim', 'gre-thr', 'scr-thr', 'wea-fix', 'arm-fix'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_4', title: 'Охота на мутантов', icon: 'Skull', items: ['mut-kil', 'mut-boar-kil', 'mut-flsh-kil', 'mut-dog-kil', 'mut-pse-kil', 'mut-tush-kil', 'mut-krv-kil', 'mut-psi-kil', 'mut-chi-kill', 'mut-gig-kil', 'mut-elp-kil'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_5', title: 'Экономика и Торговля', icon: 'Coins', items: ['max-mon-amo', 'tra', 'ite-bou-tra', 'ite-sol-tra', 'mon-gai-tra', 'mon-gai-que', 'equ-upg', 'suc-equ-upg'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_6', title: 'Выживание и Смерти', icon: 'AlertCircle', items: ['suicides', 'ano-dea', 'bul-dea', 'ble-to-dea', 'rad-dea', 'fal-dea', 'col-dea', 'ste-ano-dea', 'ele-ano-dea', 'fun-ano-dea', 'cir-ano-dea', 'tra-ano-dea', 'lig-ano-dea'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_7', title: 'Активности', icon: 'Map', items: ['tpacks-delivered', 'tpacks-money', 'tpacks-distance', 'tpacks-inter', 'air-drops-hckd', 'hid-plc', 'mining-count', 'incident-part', 'incident-win', 'completed-ops', 'kills-ops'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_8', title: 'Сессионные бои и Дуэли', icon: 'Swords', items: ['part-bf', 'won-bf', 'lost-bf', 'kills-bf', 'deaths-bf', 'fights-part', 'won-fights-personal', 'won-fights-equal'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_9', title: 'Убежище', icon: 'Home', items: ['hid-ktch-crft', 'hid-wrk-crft', 'hid-lab-crft', 'hid-mat-mon', 'hid-enrg'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) },
+  { id: 'g_10', title: 'Перемещение', icon: 'MapPin', items: ['dis-on-foo', 'dis-sne', 'dis-cra', 'dis-air'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) }
 ];
 
 const formatStatValue = (id: string, type: string, value: any) => {
@@ -225,6 +245,7 @@ export default function App() {
   
   const [user, setUser] = useState<UserData | null>(null);
   const [highlightsConfig, setHighlightsConfig] = useState<HighlightConfig[]>([]);
+  const [statsConfig, setStatsConfig] = useState<StatGroupConfig[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
   const [myCharacters, setMyCharacters] = useState<any[]>([]);
   const popupRef = React.useRef<Window | null>(null);
@@ -232,6 +253,7 @@ export default function App() {
   useEffect(() => {
     fetchUser();
     fetchHighlights();
+    fetchStatsConfig();
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
@@ -295,6 +317,20 @@ export default function App() {
       setHighlightsConfig(res.data);
     } catch (e) {
       console.error('Failed to fetch highlights config');
+    }
+  };
+
+  const fetchStatsConfig = async () => {
+    try {
+      const res = await axios.get('/api/settings/stats_config');
+      if (res.data) {
+        setStatsConfig(res.data);
+      } else {
+        setStatsConfig(DEFAULT_STATS_CONFIG);
+      }
+    } catch (e) {
+      console.error('Failed to fetch stats config');
+      setStatsConfig(DEFAULT_STATS_CONFIG);
     }
   };
 
@@ -492,11 +528,14 @@ export default function App() {
           {showAdmin && user?.role === 'admin' ? (
             <AdminPanel 
               config={highlightsConfig} 
+              statsConfig={statsConfig}
               myCharacters={myCharacters}
-              onSave={async (newConfig) => {
+              onSave={async (newConfig, newStatsConfig) => {
                 try {
                   await axios.post('/api/admin/highlights', newConfig);
+                  await axios.post('/api/admin/settings/stats_config', { value: newStatsConfig });
                   setHighlightsConfig(newConfig);
+                  setStatsConfig(newStatsConfig);
                   setShowAdmin(false);
                 } catch (e) {
                   alert('Ошибка сохранения');
@@ -635,6 +674,10 @@ export default function App() {
                               const remHours = hours % 24;
                               displayVal = `${days} д. ${remHours} ч.`;
                             }
+                            if (config.format === 'duration_hours') {
+                              const hours = Math.floor(val / (1000 * 60 * 60));
+                              displayVal = `${hours} ч.`;
+                            }
 
                             return (
                               <div key={idx} className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-4 text-center">
@@ -643,30 +686,21 @@ export default function App() {
                               </div>
                             );
                           })}
-                          <div className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-4 text-center">
-                            <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">Время в игре</div>
-                            <div className="text-lg font-bold text-purple-400 mt-1">
-                              {formatStatValue('pla-tim', 'DURATION', getStatValue('pla-tim') || 0)}
-                            </div>
-                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                      {STAT_GROUPS.map((group, groupIdx) => {
-                        const groupStats = group.keys
-                          .map(key => profileData.stats.find(s => s.id === key))
-                          .filter(Boolean) as StatItem[];
+                      {statsConfig.map((group, groupIdx) => {
+                        const visibleItems = group.items.filter(item => !item.isHidden);
+                        if (visibleItems.length === 0) return null;
 
-                        if (groupStats.length === 0) return null;
-
-                        const Icon = group.icon;
+                        const Icon = ICON_MAP[group.icon] || Activity;
 
                         return (
                           <motion.div
-                            key={group.title}
+                            key={group.id}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: groupIdx * 0.05 }}
@@ -681,22 +715,64 @@ export default function App() {
                             <div className="p-2 flex-1">
                               <table className="w-full text-sm">
                                 <tbody>
-                                  {groupStats.map((stat, idx) => (
-                                    <tr 
-                                      key={stat.id} 
-                                      className={cn(
-                                        "transition-colors hover:bg-zinc-800/30",
-                                        idx !== groupStats.length - 1 && "border-b border-zinc-800/30"
-                                      )}
-                                    >
-                                      <td className="py-3 px-4 text-zinc-400">
-                                        {STAT_NAMES[stat.id] || stat.id}
-                                      </td>
-                                      <td className="py-3 px-4 text-right font-medium text-zinc-200">
-                                        {formatStatValue(stat.id, stat.type, stat.value)}
-                                      </td>
-                                    </tr>
-                                  ))}
+                                  {visibleItems.map((item, idx) => {
+                                    const val = evaluateFormula(item.formula, profileData.stats);
+                                    if (val === null && item.format !== 'auto') return null;
+                                    
+                                    let displayVal = String(val);
+                                    if (item.format === 'auto') {
+                                      // Fallback to old format logic if it's a simple key
+                                      const match = item.formula.match(/^\{([^}]+)\}$/);
+                                      if (match) {
+                                        const statId = match[1];
+                                        const stat = profileData.stats.find(s => s.id === statId);
+                                        if (stat) {
+                                          displayVal = formatStatValue(stat.id, stat.type, stat.value);
+                                        } else {
+                                          return null;
+                                        }
+                                      } else {
+                                        displayVal = Number(val).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+                                      }
+                                    } else if (val !== null) {
+                                      if (item.format === 'percent') displayVal = val.toFixed(1) + '%';
+                                      if (item.format === 'ratio') displayVal = val.toFixed(2);
+                                      if (item.format === 'number') displayVal = val.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+                                      if (item.format === 'duration') {
+                                        const hours = Math.floor(val / (1000 * 60 * 60));
+                                        const days = Math.floor(hours / 24);
+                                        const remHours = hours % 24;
+                                        displayVal = `${days} д. ${remHours} ч.`;
+                                      }
+                                      if (item.format === 'duration_hours') {
+                                        const hours = Math.floor(val / (1000 * 60 * 60));
+                                        displayVal = `${hours} ч.`;
+                                      }
+                                      if (item.format === 'date') {
+                                        displayVal = new Date(val).toLocaleDateString('ru-RU');
+                                      }
+                                      if (item.format === 'distance') {
+                                        displayVal = (val / 100000).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' км';
+                                      }
+                                    }
+
+                                    return (
+                                      <tr 
+                                        key={item.id} 
+                                        className={cn(
+                                          "transition-colors hover:bg-zinc-800/30",
+                                          idx !== visibleItems.length - 1 && "border-b border-zinc-800/30"
+                                        )}
+                                      >
+                                        <td className="py-3 px-4 text-zinc-400">
+                                          {item.title}
+                                        </td>
+                                        <td className="py-3 px-4 text-right font-medium text-zinc-200">
+                                          {displayVal}
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             </div>
@@ -715,19 +791,20 @@ export default function App() {
   );
 }
 
-function AdminPanel({ config, myCharacters, onSave, onClose }: { config: HighlightConfig[], myCharacters: any[], onSave: (c: HighlightConfig[]) => void, onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<'highlights' | 'users'>('highlights');
+function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { config: HighlightConfig[], statsConfig: StatGroupConfig[], myCharacters: any[], onSave: (c: HighlightConfig[], s: StatGroupConfig[]) => void, onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<'highlights' | 'stats' | 'users'>('highlights');
   const [items, setItems] = useState<HighlightConfig[]>(config);
+  const [statsItems, setStatsItems] = useState<StatGroupConfig[]>(statsConfig);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [focusedInput, setFocusedInput] = useState<{ index: number, ref: HTMLInputElement | null } | null>(null);
+  const [focusedInput, setFocusedInput] = useState<{ type: 'highlight' | 'stat', groupIndex?: number, itemIndex: number, ref: HTMLInputElement | null } | null>(null);
   const [attributeSearch, setAttributeSearch] = useState('');
   const [previewData, setPreviewData] = useState<ProfileData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewCharIndex, setPreviewCharIndex] = useState(0);
 
   useEffect(() => {
-    if (activeTab === 'highlights' && myCharacters.length > 0) {
+    if ((activeTab === 'highlights' || activeTab === 'stats') && myCharacters.length > 0) {
       const char = myCharacters[previewCharIndex];
       if (!char) return;
       setPreviewLoading(true);
@@ -789,7 +866,12 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
     const attribute = `{${key}}`;
     
     const newValue = text.substring(0, start) + attribute + text.substring(end);
-    updateItem(focusedInput.index, 'formula', newValue);
+    
+    if (focusedInput.type === 'highlight') {
+      updateItem(focusedInput.itemIndex, 'formula', newValue);
+    } else if (focusedInput.type === 'stat' && focusedInput.groupIndex !== undefined) {
+      updateStatItem(focusedInput.groupIndex, focusedInput.itemIndex, 'formula', newValue);
+    }
     
     // Restore focus and selection after state update
     setTimeout(() => {
@@ -797,6 +879,63 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
       const newPos = start + attribute.length;
       input.setSelectionRange(newPos, newPos);
     }, 0);
+  };
+
+  const updateStatGroup = (groupIndex: number, field: keyof StatGroupConfig, value: any) => {
+    const newGroups = [...statsItems];
+    newGroups[groupIndex] = { ...newGroups[groupIndex], [field]: value };
+    setStatsItems(newGroups);
+  };
+
+  const addStatGroup = () => {
+    setStatsItems([...statsItems, { id: `g_${Date.now()}`, title: 'Новый блок', icon: 'Activity', items: [] }]);
+  };
+
+  const removeStatGroup = (groupIndex: number) => {
+    setStatsItems(statsItems.filter((_, i) => i !== groupIndex));
+  };
+
+  const moveStatGroup = (groupIndex: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && groupIndex === 0) return;
+    if (direction === 'down' && groupIndex === statsItems.length - 1) return;
+    
+    const newGroups = [...statsItems];
+    const temp = newGroups[groupIndex];
+    newGroups[groupIndex] = newGroups[groupIndex + (direction === 'up' ? -1 : 1)];
+    newGroups[groupIndex + (direction === 'up' ? -1 : 1)] = temp;
+    setStatsItems(newGroups);
+  };
+
+  const updateStatItem = (groupIndex: number, itemIndex: number, field: keyof StatItemConfig, value: any) => {
+    const newGroups = [...statsItems];
+    const newItems = [...newGroups[groupIndex].items];
+    newItems[itemIndex] = { ...newItems[itemIndex], [field]: value };
+    newGroups[groupIndex].items = newItems;
+    setStatsItems(newGroups);
+  };
+
+  const addStatItem = (groupIndex: number) => {
+    const newGroups = [...statsItems];
+    newGroups[groupIndex].items.push({ id: `i_${Date.now()}`, title: 'Новый атрибут', formula: '{kil}', format: 'auto', isHidden: false });
+    setStatsItems(newGroups);
+  };
+
+  const removeStatItem = (groupIndex: number, itemIndex: number) => {
+    const newGroups = [...statsItems];
+    newGroups[groupIndex].items = newGroups[groupIndex].items.filter((_, i) => i !== itemIndex);
+    setStatsItems(newGroups);
+  };
+
+  const moveStatItem = (groupIndex: number, itemIndex: number, direction: 'up' | 'down') => {
+    const newGroups = [...statsItems];
+    const items = newGroups[groupIndex].items;
+    if (direction === 'up' && itemIndex === 0) return;
+    if (direction === 'down' && itemIndex === items.length - 1) return;
+    
+    const temp = items[itemIndex];
+    items[itemIndex] = items[itemIndex + (direction === 'up' ? -1 : 1)];
+    items[itemIndex + (direction === 'up' ? -1 : 1)] = temp;
+    setStatsItems(newGroups);
   };
 
   return (
@@ -829,6 +968,15 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
           Хайлайты (Статистика)
         </button>
         <button
+          onClick={() => setActiveTab('stats')}
+          className={cn(
+            "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+            activeTab === 'stats' ? "bg-emerald-500/10 text-emerald-400" : "text-zinc-400 hover:text-zinc-200"
+          )}
+        >
+          Статистика (Блоки)
+        </button>
+        <button
           onClick={() => setActiveTab('users')}
           className={cn(
             "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
@@ -839,11 +987,13 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
         </button>
       </div>
 
-      {activeTab === 'highlights' && (
+      {(activeTab === 'highlights' || activeTab === 'stats') && (
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-4">
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-              {items.map((item, idx) => (
+            {activeTab === 'highlights' && (
+              <>
+                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                  {items.map((item, idx) => (
                 <div key={idx} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
                   <div className="flex-1 space-y-3 w-full">
                     <div className="flex gap-3">
@@ -883,6 +1033,7 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
                           <option value="ratio">Дробь (2.00)</option>
                           <option value="percent">Процент (%)</option>
                           <option value="duration">Время (дн. ч.)</option>
+                          <option value="duration_hours">Время (часы)</option>
                         </select>
                         <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
                           <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -895,7 +1046,7 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
                       <input
                         type="text"
                         value={item.formula}
-                        onFocus={(e) => setFocusedInput({ index: idx, ref: e.target })}
+                        onFocus={(e) => setFocusedInput({ type: 'highlight', itemIndex: idx, ref: e.target })}
                         onChange={(e) => updateItem(idx, 'formula', e.target.value)}
                         placeholder="Формула (напр. {kil} / {dea})"
                         className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
@@ -913,24 +1064,180 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
                   </button>
                 </div>
               ))}
-            </div>
+                </div>
 
-            <div className="flex justify-between items-center border-t border-zinc-800 pt-6">
-              <button
-                onClick={addItem}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Добавить показатель
-              </button>
-              <button
-                onClick={() => onSave(items)}
-                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
-              >
-                <Save className="w-4 h-4" />
-                Сохранить настройки
-              </button>
-            </div>
+                <div className="flex justify-between items-center border-t border-zinc-800 pt-6 mt-4">
+                  <button
+                    onClick={addItem}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить показатель
+                  </button>
+                  <button
+                    onClick={() => onSave(items, statsItems)}
+                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+                  >
+                    <Save className="w-4 h-4" />
+                    Сохранить настройки
+                  </button>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'stats' && (
+              <>
+                <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                  {statsItems.map((group, groupIdx) => (
+                    <div key={group.id} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 space-y-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col gap-1">
+                          <button onClick={() => moveStatGroup(groupIdx, 'up')} disabled={groupIdx === 0} className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronUp className="w-4 h-4" /></button>
+                          <button onClick={() => moveStatGroup(groupIdx, 'down')} disabled={groupIdx === statsItems.length - 1} className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronDown className="w-4 h-4" /></button>
+                        </div>
+                        <input
+                          type="text"
+                          value={group.title}
+                          onChange={(e) => updateStatGroup(groupIdx, 'title', e.target.value)}
+                          placeholder="Название блока"
+                          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-bold"
+                        />
+                        <div className="relative w-40">
+                          <select
+                            value={group.icon}
+                            onChange={(e) => updateStatGroup(groupIdx, 'icon', e.target.value)}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+                          >
+                            {Object.keys(ICON_MAP).map(iconName => (
+                              <option key={iconName} value={iconName}>{iconName}</option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                            <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
+                        <button onClick={() => removeStatGroup(groupIdx)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0">
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-2 pl-8 border-l-2 border-zinc-800/50 ml-2">
+                        {group.items.map((item, itemIdx) => (
+                          <div key={item.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3 flex flex-col gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="flex flex-col gap-1">
+                                <button onClick={() => moveStatItem(groupIdx, itemIdx, 'up')} disabled={itemIdx === 0} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronUp className="w-3 h-3" /></button>
+                                <button onClick={() => moveStatItem(groupIdx, itemIdx, 'down')} disabled={itemIdx === group.items.length - 1} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronDown className="w-3 h-3" /></button>
+                              </div>
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={(e) => updateStatItem(groupIdx, itemIdx, 'title', e.target.value)}
+                                placeholder="Название атрибута"
+                                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                              />
+                              <div className="relative w-32">
+                                <select
+                                  value={item.format}
+                                  onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
+                                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+                                >
+                                  <option value="auto">Авто</option>
+                                  <option value="number">Число</option>
+                                  <option value="ratio">Дробь (2.00)</option>
+                                  <option value="percent">Процент (%)</option>
+                                  <option value="duration">Время (дн. ч.)</option>
+                                  <option value="duration_hours">Время (часы)</option>
+                                  <option value="date">Дата</option>
+                                  <option value="distance">Дистанция</option>
+                                </select>
+                                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                                  <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
+                              </div>
+                              <div className="relative w-32">
+                                <select
+                                  value={groupIdx}
+                                  onChange={(e) => {
+                                    const newGroupIdx = Number(e.target.value);
+                                    if (newGroupIdx !== groupIdx) {
+                                      const newGroups = [...statsItems];
+                                      const itemToMove = newGroups[groupIdx].items.splice(itemIdx, 1)[0];
+                                      newGroups[newGroupIdx].items.push(itemToMove);
+                                      setStatsItems(newGroups);
+                                    }
+                                  }}
+                                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-400 focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+                                >
+                                  {statsItems.map((g, gIdx) => (
+                                    <option key={g.id} value={gIdx}>{g.title || `Блок ${gIdx + 1}`}</option>
+                                  ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                                  <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
+                              </div>
+                              <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={item.isHidden}
+                                  onChange={(e) => updateStatItem(groupIdx, itemIdx, 'isHidden', e.target.checked)}
+                                  className="rounded bg-zinc-900 border-zinc-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-950"
+                                />
+                                Скрыть
+                              </label>
+                              <button onClick={() => removeStatItem(groupIdx, itemIdx)} className="p-1.5 text-red-400 hover:text-red-300 transition-colors shrink-0">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="flex gap-3 pl-6">
+                              <input
+                                type="text"
+                                value={item.formula}
+                                onFocus={(e) => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, ref: e.target })}
+                                onChange={(e) => updateStatItem(groupIdx, itemIdx, 'formula', e.target.value)}
+                                placeholder="Формула (напр. {kil} / {dea})"
+                                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
+                              />
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => addStatItem(groupIdx)}
+                          className="mt-2 px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          Добавить атрибут
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center border-t border-zinc-800 pt-6">
+                  <button
+                    onClick={addStatGroup}
+                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Добавить блок
+                  </button>
+                  <button
+                    onClick={() => onSave(items, statsItems)}
+                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+                  >
+                    <Save className="w-4 h-4" />
+                    Сохранить настройки
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="w-full lg:w-72 shrink-0">

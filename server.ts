@@ -47,6 +47,11 @@ db.exec(`
     order_index INTEGER NOT NULL,
     format TEXT DEFAULT 'number'
   );
+
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
 
 // Attempt to add access_token column if it doesn't exist (migration)
@@ -63,6 +68,7 @@ if (count.count === 0) {
   insert.run('K/D Игроки', '{kil} / {dea}', 'text-emerald-400', 1, 'ratio');
   insert.run('Точность', '({sho-hit} / {sho-fir}) * 100', 'text-blue-400', 2, 'percent');
   insert.run('В голову', '({sho-hea} / {sho-hit}) * 100', 'text-amber-400', 3, 'percent');
+  insert.run('Время в игре', '{pla-tim}', 'text-purple-400', 4, 'duration');
 }
 
 // Clean up corrupted users from previous bugs
@@ -460,6 +466,30 @@ app.post('/api/admin/highlights', requireAuth, requireAdmin, (req, res) => {
 
     try {
         transaction(highlights);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Settings API
+app.get('/api/settings/:key', (req, res) => {
+    try {
+        const setting = db.prepare('SELECT value FROM settings WHERE key = ?').get(req.params.key) as any;
+        if (setting) {
+            res.json(JSON.parse(setting.value));
+        } else {
+            res.json(null);
+        }
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/admin/settings/:key', requireAuth, requireAdmin, (req, res) => {
+    try {
+        const value = JSON.stringify(req.body);
+        db.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?').run(req.params.key, value, value);
         res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
