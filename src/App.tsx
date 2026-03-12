@@ -959,6 +959,16 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
+    // Check if it's a highlight item
+    const activeHighlightIndex = items.findIndex((i: any) => i.id === active.id);
+    if (activeHighlightIndex !== -1) {
+      const overHighlightIndex = items.findIndex((i: any) => i.id === over.id);
+      if (overHighlightIndex !== -1) {
+        setItems(arrayMove(items, activeHighlightIndex, overHighlightIndex));
+        return;
+      }
+    }
+
     const activeGroup = statsItems.find((g: any) => g.id === active.id || g.items.find((i: any) => i.id === active.id));
     const overGroup = statsItems.find((g: any) => g.id === over.id || g.items.find((i: any) => i.id === over.id));
 
@@ -1076,53 +1086,110 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
   const style = { transform: CSS.Transform.toString(transform), transition };
 
   return (
-    <div ref={setNodeRef} style={style} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3 flex flex-col gap-3">
-      <div className="flex items-center gap-3">
-        <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white">
-          <GripVertical className="w-4 h-4" />
-        </div>
+    <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex gap-4 items-center">
+      <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white">
+        <GripVertical className="w-5 h-5" />
+      </div>
+      <div className="flex-1 flex gap-4 items-center">
         <input
           type="text"
           value={item.title}
           onChange={(e) => updateStatItem(groupIdx, itemIdx, 'title', e.target.value)}
-          placeholder="Название атрибута"
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+          placeholder="Название"
+          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
         />
-        <select
-          value={item.format}
-          onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
-          className="w-24 bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-        >
-          <option value="auto">Авто</option>
-          <option value="number">Число</option>
-          <option value="ratio">Дробь</option>
-          <option value="percent">Процент</option>
-          <option value="duration">Время</option>
-          <option value="duration_hours">Часы</option>
-          <option value="date">Дата</option>
-          <option value="distance">Дистанция</option>
-        </select>
-        <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={item.isHidden}
-            onChange={(e) => updateStatItem(groupIdx, itemIdx, 'isHidden', e.target.checked)}
-            className="rounded bg-zinc-900 border-zinc-800 text-emerald-500 focus:ring-emerald-500"
-          />
-          Скрыть
-        </label>
-        <button onClick={() => removeStatItem(groupIdx, itemIdx)} className="p-1.5 text-red-400 hover:text-red-300 transition-colors shrink-0">
+        <input
+          type="text"
+          value={item.formula || ''}
+          onChange={(e) => updateStatItem(groupIdx, itemIdx, 'formula', e.target.value)}
+          onFocus={() => setFocusedInput(item.id)}
+          placeholder="Формула"
+          className="w-40 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-1 focus:ring-emerald-500 outline-none"
+        />
+        <button onClick={() => removeStatItem(groupIdx, itemIdx)} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
-      <input
-        type="text"
-        value={item.formula}
-        onFocus={(e) => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, ref: e.target })}
-        onChange={(e) => updateStatItem(groupIdx, itemIdx, 'formula', e.target.value)}
-        placeholder="Формула"
-        className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
-      />
+    </div>
+  );
+}
+
+function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
+      <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white mt-1 md:mt-0">
+        <GripVertical className="w-5 h-5" />
+      </div>
+      <div className="flex-1 space-y-3 w-full">
+        <div className="flex gap-3">
+          <input
+            type="text"
+            value={item.title}
+            onChange={(e) => updateItem(idx, 'title', e.target.value)}
+            placeholder="Название (напр. K/D)"
+            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+          />
+          <div className="relative w-40">
+            <select
+              value={item.color}
+              onChange={(e) => updateItem(idx, 'color', e.target.value)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+            >
+              <option value="text-white">Белый</option>
+              <option value="text-emerald-400">Изумрудный</option>
+              <option value="text-blue-400">Синий</option>
+              <option value="text-amber-400">Желтый</option>
+              <option value="text-red-400">Красный</option>
+              <option value="text-purple-400">Фиолетовый</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+              <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+          <div className="relative w-32">
+            <select
+              value={item.format}
+              onChange={(e) => updateItem(idx, 'format', e.target.value as any)}
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+            >
+              <option value="number">Число</option>
+              <option value="ratio">Дробь (2.00)</option>
+              <option value="percent">Процент (%)</option>
+              <option value="duration">Время (дн. ч.)</option>
+              <option value="duration_hours">Время (часы)</option>
+            </select>
+            <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+              <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </div>
+        <div>
+          <input
+            type="text"
+            value={item.formula}
+            onFocus={(e) => setFocusedInput({ type: 'highlight', itemIndex: idx, ref: e.target })}
+            onChange={(e) => updateItem(idx, 'formula', e.target.value)}
+            placeholder="Формула (напр. {kil} / {dea})"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
+          />
+          <p className="text-[10px] text-zinc-500 mt-1">
+            Используйте ID статистики в фигурных скобках, например: <code className="text-emerald-400/70">{'{sho-hea} / {sho-hit} * 100'}</code>
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={() => removeItem(idx)}
+        className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0"
+      >
+        <Trash2 className="w-5 h-5" />
+      </button>
     </div>
   );
 }
@@ -1180,81 +1247,21 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-4">
             {activeTab === 'highlights' && (
-              <>
-                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-                  {items.map((item, idx) => (
-                <div key={idx} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
-                  <div className="flex-1 space-y-3 w-full">
-                    <div className="flex gap-3">
-                      <input
-                        type="text"
-                        value={item.title}
-                        onChange={(e) => updateItem(idx, 'title', e.target.value)}
-                        placeholder="Название (напр. K/D)"
-                        className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-4 pr-2">
+                    {items.map((item, idx) => (
+                      <SortableHighlightItem
+                        key={item.id}
+                        item={item}
+                        idx={idx}
+                        updateItem={updateItem}
+                        removeItem={removeItem}
+                        setFocusedInput={setFocusedInput}
                       />
-                      <div className="relative w-40">
-                        <select
-                          value={item.color}
-                          onChange={(e) => updateItem(idx, 'color', e.target.value)}
-                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-                        >
-                          <option value="text-white">Белый</option>
-                          <option value="text-emerald-400">Изумрудный</option>
-                          <option value="text-blue-400">Синий</option>
-                          <option value="text-amber-400">Желтый</option>
-                          <option value="text-red-400">Красный</option>
-                          <option value="text-purple-400">Фиолетовый</option>
-                        </select>
-                        <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                          <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="relative w-32">
-                        <select
-                          value={item.format}
-                          onChange={(e) => updateItem(idx, 'format', e.target.value as any)}
-                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-                        >
-                          <option value="number">Число</option>
-                          <option value="ratio">Дробь (2.00)</option>
-                          <option value="percent">Процент (%)</option>
-                          <option value="duration">Время (дн. ч.)</option>
-                          <option value="duration_hours">Время (часы)</option>
-                        </select>
-                        <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                          <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <input
-                        type="text"
-                        value={item.formula}
-                        onFocus={(e) => setFocusedInput({ type: 'highlight', itemIndex: idx, ref: e.target })}
-                        onChange={(e) => updateItem(idx, 'formula', e.target.value)}
-                        placeholder="Формула (напр. {kil} / {dea})"
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
-                      />
-                      <p className="text-[10px] text-zinc-500 mt-1">
-                        Используйте ID статистики в фигурных скобках, например: <code className="text-emerald-400/70">{'{sho-hea} / {sho-hit} * 100'}</code>
-                      </p>
-                    </div>
+                    ))}
                   </div>
-                  <button
-                    onClick={() => removeItem(idx)}
-                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              ))}
-                </div>
-
+                </SortableContext>
                 <div className="flex justify-between items-center border-t border-zinc-800 pt-6 mt-4">
                   <button
                     onClick={addItem}
@@ -1271,7 +1278,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
                     Сохранить настройки
                   </button>
                 </div>
-              </>
+              </DndContext>
             )}
 
             {activeTab === 'stats' && (
@@ -1353,7 +1360,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
                 />
               </div>
 
-              <div className="space-y-1 pr-2">
+              <div className="space-y-1 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                 {Object.entries(STAT_NAMES)
                   .filter(([key, name]) => 
                     key.toLowerCase().includes(attributeSearch.toLowerCase()) || 
