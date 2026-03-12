@@ -492,6 +492,7 @@ export default function App() {
           {showAdmin && user?.role === 'admin' ? (
             <AdminPanel 
               config={highlightsConfig} 
+              myCharacters={myCharacters}
               onSave={async (newConfig) => {
                 try {
                   await axios.post('/api/admin/highlights', newConfig);
@@ -708,12 +709,26 @@ export default function App() {
   );
 }
 
-function AdminPanel({ config, onSave, onClose }: { config: HighlightConfig[], onSave: (c: HighlightConfig[]) => void, onClose: () => void }) {
+function AdminPanel({ config, myCharacters, onSave, onClose }: { config: HighlightConfig[], myCharacters: any[], onSave: (c: HighlightConfig[]) => void, onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<'highlights' | 'users'>('highlights');
   const [items, setItems] = useState<HighlightConfig[]>(config);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [focusedInput, setFocusedInput] = useState<{ index: number, ref: HTMLInputElement | null } | null>(null);
+  const [attributeSearch, setAttributeSearch] = useState('');
+  const [previewData, setPreviewData] = useState<ProfileData | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'highlights' && myCharacters.length > 0 && !previewData && !previewLoading) {
+      const char = myCharacters[0];
+      setPreviewLoading(true);
+      axios.get(`/api/profile/${char.region}/${encodeURIComponent(char.name)}`)
+        .then(res => setPreviewData(res.data))
+        .catch(err => console.error('Preview fetch error', err))
+        .finally(() => setPreviewLoading(false));
+    }
+  }, [activeTab, myCharacters]);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -911,24 +926,56 @@ function AdminPanel({ config, onSave, onClose }: { config: HighlightConfig[], on
 
           <div className="w-full lg:w-72 shrink-0">
             <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 sticky top-4">
-              <div className="flex items-center gap-2 mb-4">
-                <Activity className="w-4 h-4 text-emerald-500" />
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Атрибуты</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-emerald-500" />
+                  <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Атрибуты</h3>
+                </div>
+                {previewLoading && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
               </div>
+              
+              <div className="mb-3 relative">
+                <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                  <Search className="h-3 w-3 text-zinc-500" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Поиск атрибута..."
+                  value={attributeSearch}
+                  onChange={(e) => setAttributeSearch(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+                />
+              </div>
+
               <div className="space-y-1 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {Object.entries(STAT_NAMES).map(([key, name]) => (
-                  <button
-                    key={key}
-                    onClick={() => insertAttribute(key)}
-                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-emerald-500/10 text-[11px] transition-all flex flex-col group/attr"
-                  >
-                    <span className="font-mono text-emerald-500 font-bold group-hover/attr:scale-105 transition-transform">{"{" + key + "}"}</span>
-                    <span className="text-zinc-500 truncate group-hover/attr:text-zinc-300">{name}</span>
-                  </button>
-                ))}
+                {Object.entries(STAT_NAMES)
+                  .filter(([key, name]) => 
+                    key.toLowerCase().includes(attributeSearch.toLowerCase()) || 
+                    name.toLowerCase().includes(attributeSearch.toLowerCase())
+                  )
+                  .map(([key, name]) => {
+                    const stat = previewData?.stats.find(s => s.id === key);
+                    const previewValue = stat ? formatStatValue(stat.id, stat.type, stat.value) : '—';
+                    
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => insertAttribute(key)}
+                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-emerald-500/10 text-[11px] transition-all flex flex-col group/attr"
+                      >
+                        <div className="flex justify-between items-start w-full mb-1">
+                          <span className="font-mono text-emerald-500 font-bold group-hover/attr:scale-105 transition-transform">{"{" + key + "}"}</span>
+                          <span className="text-[10px] text-zinc-400 font-mono bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[100px] text-right" title={String(previewValue)}>
+                            {previewValue}
+                          </span>
+                        </div>
+                        <span className="text-zinc-500 truncate group-hover/attr:text-zinc-300">{name}</span>
+                      </button>
+                    );
+                })}
               </div>
               <div className="mt-4 pt-4 border-t border-zinc-800 text-[10px] text-zinc-500 italic">
-                Нажмите на атрибут, чтобы вставить его в текущую формулу
+                {previewData ? `Превью данных для: ${previewData.username}` : 'Нажмите на атрибут, чтобы вставить его в текущую формулу'}
               </div>
             </div>
           </div>
