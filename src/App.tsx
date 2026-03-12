@@ -221,6 +221,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [showChars, setShowChars] = useState(false);
   
   const [user, setUser] = useState<UserData | null>(null);
   const [highlightsConfig, setHighlightsConfig] = useState<HighlightConfig[]>([]);
@@ -400,40 +401,60 @@ export default function App() {
             </span>
             
             {myCharacters.length > 0 && (
-              <div className="relative group">
-                <button className="text-sm text-zinc-400 hover:text-zinc-200 flex items-center gap-1 py-2">
+              <div 
+                className="relative"
+                onMouseEnter={() => setShowChars(true)}
+                onMouseLeave={() => setShowChars(false)}
+              >
+                <button className="text-sm text-zinc-400 hover:text-zinc-200 flex items-center gap-1 py-2 transition-colors">
                   <User className="w-4 h-4" />
                   Персонажи
                 </button>
-                <div className="absolute right-0 top-full mt-2 w-56 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl p-2 hidden group-hover:block z-50">
-                  <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 mb-1">
-                    Ваши персонажи
-                  </div>
-                  {Array.isArray(myCharacters) && myCharacters.map((char: any, index: number) => (
-                    <button
-                      key={char.uuid || char.name || index}
-                      onClick={() => {
-                        setNickname(char.name);
-                        setRegion(char.region);
-                        // Trigger search manually
-                        setLoading(true);
-                        setError(null);
-                        setProfileData(null);
-                        axios.get(`/api/profile/${char.region}/${encodeURIComponent(char.name)}`)
-                          .then(res => setProfileData(res.data))
-                          .catch(err => {
-                            if (err.response?.status === 404) setError('Игрок не найден.');
-                            else setError('Ошибка при получении данных.');
-                          })
-                          .finally(() => setLoading(false));
-                      }}
-                      className="w-full text-left px-3 py-2 hover:bg-zinc-800 rounded-lg text-sm text-zinc-300 hover:text-white transition-colors flex justify-between items-center group/item"
+                <AnimatePresence>
+                  {showChars && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 top-full pt-2 w-64 z-50"
                     >
-                      <span className="font-medium">{char.name}</span>
-                      <span className="text-xs text-zinc-500 group-hover/item:text-zinc-400 uppercase bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800">{char.region}</span>
-                    </button>
-                  ))}
-                </div>
+                      <div className="bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-2 overflow-hidden">
+                        <div className="px-3 py-2 text-[10px] font-bold text-zinc-500 uppercase tracking-widest border-b border-zinc-800 mb-1">
+                          Ваши персонажи
+                        </div>
+                        <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                          {Array.isArray(myCharacters) && myCharacters.map((char: any, index: number) => (
+                            <button
+                              key={char.uuid || char.name || index}
+                              onClick={() => {
+                                setNickname(char.name);
+                                setRegion(char.region);
+                                setShowChars(false);
+                                // Trigger search
+                                const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                                // We need to handle this specially since state updates are async
+                                setLoading(true);
+                                setError(null);
+                                setProfileData(null);
+                                axios.get(`/api/profile/${char.region}/${encodeURIComponent(char.name)}`)
+                                  .then(res => setProfileData(res.data))
+                                  .catch(err => {
+                                    if (err.response?.status === 404) setError('Игрок не найден.');
+                                    else setError('Ошибка при получении данных.');
+                                  })
+                                  .finally(() => setLoading(false));
+                              }}
+                              className="w-full text-left px-3 py-2.5 hover:bg-emerald-500/10 rounded-lg text-sm text-zinc-300 hover:text-emerald-400 transition-all flex justify-between items-center group/item"
+                            >
+                              <span className="font-medium truncate mr-2">{char.name}</span>
+                              <span className="text-[10px] font-bold text-zinc-500 group-hover/item:text-emerald-500/70 uppercase bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 transition-colors">{char.region}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
 
@@ -519,20 +540,25 @@ export default function App() {
                       required
                     />
                   </div>
-                  <div className="relative w-full md:w-48">
+                  <div className="relative w-full md:w-56">
                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                       <MapPin className="h-5 w-5 text-zinc-500" />
                     </div>
                     <select
                       value={region}
                       onChange={(e) => setRegion(e.target.value as Region)}
-                      className="block w-full pl-11 pr-10 py-3 bg-zinc-950/50 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all appearance-none"
+                      className="block w-full pl-11 pr-10 py-3 bg-zinc-950/50 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all appearance-none cursor-pointer hover:bg-zinc-900/50"
                     >
-                      <option value="ru">RU (Россия)</option>
-                      <option value="eu">EU (Европа)</option>
-                      <option value="na">NA (Сев. Америка)</option>
-                      <option value="sea">SEA (Азия)</option>
+                      <option value="ru" className="bg-zinc-900">RU (Россия)</option>
+                      <option value="eu" className="bg-zinc-900">EU (Европа)</option>
+                      <option value="na" className="bg-zinc-900">NA (Сев. Америка)</option>
+                      <option value="sea" className="bg-zinc-900">SEA (Азия)</option>
                     </select>
+                    <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
                   </div>
                   <button
                     type="submit"
@@ -687,6 +713,7 @@ function AdminPanel({ config, onSave, onClose }: { config: HighlightConfig[], on
   const [items, setItems] = useState<HighlightConfig[]>(config);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [focusedInput, setFocusedInput] = useState<{ index: number, ref: HTMLInputElement | null } | null>(null);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -729,12 +756,32 @@ function AdminPanel({ config, onSave, onClose }: { config: HighlightConfig[], on
     setItems(items.filter((_, i) => i !== index));
   };
 
+  const insertAttribute = (key: string) => {
+    if (focusedInput === null || focusedInput.ref === null) return;
+    
+    const input = focusedInput.ref;
+    const start = input.selectionStart || 0;
+    const end = input.selectionEnd || 0;
+    const text = input.value;
+    const attribute = `{${key}}`;
+    
+    const newValue = text.substring(0, start) + attribute + text.substring(end);
+    updateItem(focusedInput.index, 'formula', newValue);
+    
+    // Restore focus and selection after state update
+    setTimeout(() => {
+      input.focus();
+      const newPos = start + attribute.length;
+      input.setSelectionRange(newPos, newPos);
+    }, 0);
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-4xl mx-auto shadow-2xl"
+      className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-6xl mx-auto shadow-2xl"
     >
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -770,81 +817,122 @@ function AdminPanel({ config, onSave, onClose }: { config: HighlightConfig[], on
       </div>
 
       {activeTab === 'highlights' && (
-        <>
-          <div className="space-y-4 mb-8">
-            {items.map((item, idx) => (
-              <div key={idx} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
-                <div className="flex-1 space-y-3 w-full">
-                  <div className="flex gap-3">
-                    <input
-                      type="text"
-                      value={item.title}
-                      onChange={(e) => updateItem(idx, 'title', e.target.value)}
-                      placeholder="Название (напр. K/D)"
-                      className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
-                    />
-                    <select
-                      value={item.color}
-                      onChange={(e) => updateItem(idx, 'color', e.target.value)}
-                      className="w-40 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
-                    >
-                      <option value="text-white">Белый</option>
-                      <option value="text-emerald-400">Изумрудный</option>
-                      <option value="text-blue-400">Синий</option>
-                      <option value="text-amber-400">Желтый</option>
-                      <option value="text-red-400">Красный</option>
-                      <option value="text-purple-400">Фиолетовый</option>
-                    </select>
-                    <select
-                      value={item.format}
-                      onChange={(e) => updateItem(idx, 'format', e.target.value as any)}
-                      className="w-32 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
-                    >
-                      <option value="number">Число</option>
-                      <option value="ratio">Дробь (2.00)</option>
-                      <option value="percent">Процент (%)</option>
-                    </select>
+        <div className="flex flex-col lg:flex-row gap-8">
+          <div className="flex-1 space-y-4">
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+              {items.map((item, idx) => (
+                <div key={idx} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                  <div className="flex-1 space-y-3 w-full">
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={item.title}
+                        onChange={(e) => updateItem(idx, 'title', e.target.value)}
+                        placeholder="Название (напр. K/D)"
+                        className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                      />
+                      <div className="relative w-40">
+                        <select
+                          value={item.color}
+                          onChange={(e) => updateItem(idx, 'color', e.target.value)}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+                        >
+                          <option value="text-white">Белый</option>
+                          <option value="text-emerald-400">Изумрудный</option>
+                          <option value="text-blue-400">Синий</option>
+                          <option value="text-amber-400">Желтый</option>
+                          <option value="text-red-400">Красный</option>
+                          <option value="text-purple-400">Фиолетовый</option>
+                        </select>
+                        <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                          <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="relative w-32">
+                        <select
+                          value={item.format}
+                          onChange={(e) => updateItem(idx, 'format', e.target.value as any)}
+                          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+                        >
+                          <option value="number">Число</option>
+                          <option value="ratio">Дробь (2.00)</option>
+                          <option value="percent">Процент (%)</option>
+                        </select>
+                        <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                          <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        value={item.formula}
+                        onFocus={(e) => setFocusedInput({ index: idx, ref: e.target })}
+                        onChange={(e) => updateItem(idx, 'formula', e.target.value)}
+                        placeholder="Формула (напр. {kil} / {dea})"
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
+                      />
+                      <p className="text-[10px] text-zinc-500 mt-1">
+                        Используйте ID статистики в фигурных скобках, например: <code className="text-emerald-400/70">{'{sho-hea} / {sho-hit} * 100'}</code>
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <input
-                      type="text"
-                      value={item.formula}
-                      onChange={(e) => updateItem(idx, 'formula', e.target.value)}
-                      placeholder="Формула (напр. {kil} / {dea})"
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
-                    />
-                    <p className="text-xs text-zinc-500 mt-1">
-                      Используйте ID статистики в фигурных скобках, например: <code className="text-emerald-400/70">{'{sho-hea} / {sho-hit} * 100'}</code>
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => removeItem(idx)}
+                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => removeItem(idx)}
-                  className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            <div className="flex justify-between items-center border-t border-zinc-800 pt-6">
+              <button
+                onClick={addItem}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Добавить показатель
+              </button>
+              <button
+                onClick={() => onSave(items)}
+                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+              >
+                <Save className="w-4 h-4" />
+                Сохранить настройки
+              </button>
+            </div>
           </div>
 
-          <div className="flex justify-between items-center border-t border-zinc-800 pt-6">
-            <button
-              onClick={addItem}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Добавить показатель
-            </button>
-            <button
-              onClick={() => onSave(items)}
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
-            >
-              <Save className="w-4 h-4" />
-              Сохранить настройки
-            </button>
+          <div className="w-full lg:w-72 shrink-0">
+            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 sticky top-4">
+              <div className="flex items-center gap-2 mb-4">
+                <Activity className="w-4 h-4 text-emerald-500" />
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Атрибуты</h3>
+              </div>
+              <div className="space-y-1 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                {Object.entries(STAT_NAMES).map(([key, name]) => (
+                  <button
+                    key={key}
+                    onClick={() => insertAttribute(key)}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-emerald-500/10 text-[11px] transition-all flex flex-col group/attr"
+                  >
+                    <span className="font-mono text-emerald-500 font-bold group-hover/attr:scale-105 transition-transform">{"{" + key + "}"}</span>
+                    <span className="text-zinc-500 truncate group-hover/attr:text-zinc-300">{name}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 pt-4 border-t border-zinc-800 text-[10px] text-zinc-500 italic">
+                Нажмите на атрибут, чтобы вставить его в текущую формулу
+              </div>
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {activeTab === 'users' && (
@@ -878,14 +966,21 @@ function AdminPanel({ config, onSave, onClose }: { config: HighlightConfig[], on
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <select
-                          value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                          className="bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500"
-                        >
-                          <option value="user">Пользователь</option>
-                          <option value="admin">Администратор</option>
-                        </select>
+                        <div className="relative inline-block w-32">
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer"
+                          >
+                            <option value="user">Пользователь</option>
+                            <option value="admin">Администратор</option>
+                          </select>
+                          <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                            <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   ))}
