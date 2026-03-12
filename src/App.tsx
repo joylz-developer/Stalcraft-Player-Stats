@@ -3,8 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, User, Shield, Crosshair, Activity, AlertCircle, MapPin, Loader2, 
   Target, Skull, Coins, Map, Swords, Home, Trophy, Percent, Clock, Calendar,
-  Settings, LogOut, Plus, Trash2, Save, ChevronUp, ChevronDown
+  Settings, LogOut, Plus, Trash2, Save, ChevronUp, ChevronDown, GripVertical
 } from 'lucide-react';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import axios from 'axios';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -945,15 +948,45 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
     setStatsItems(statsItems.filter((_, i) => i !== groupIndex));
   };
 
-  const moveStatGroup = (groupIndex: number, direction: 'up' | 'down') => {
-    if (direction === 'up' && groupIndex === 0) return;
-    if (direction === 'down' && groupIndex === statsItems.length - 1) return;
-    
-    const newGroups = [...statsItems];
-    const temp = newGroups[groupIndex];
-    newGroups[groupIndex] = newGroups[groupIndex + (direction === 'up' ? -1 : 1)];
-    newGroups[groupIndex + (direction === 'up' ? -1 : 1)] = temp;
-    setStatsItems(newGroups);
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeGroup = statsItems.find((g: any) => g.id === active.id || g.items.find((i: any) => i.id === active.id));
+    const overGroup = statsItems.find((g: any) => g.id === over.id || g.items.find((i: any) => i.id === over.id));
+
+    if (activeGroup && overGroup) {
+      if (activeGroup.id === active.id && overGroup.id === over.id) {
+        const oldIndex = statsItems.findIndex((g: any) => g.id === active.id);
+        const newIndex = statsItems.findIndex((g: any) => g.id === over.id);
+        setStatsItems(arrayMove(statsItems, oldIndex, newIndex));
+      } else {
+        const activeItemIndex = activeGroup.items.findIndex((i: any) => i.id === active.id);
+        const overItemIndex = overGroup.items.findIndex((i: any) => i.id === over.id);
+        
+        if (activeGroup === overGroup) {
+          const newGroups = [...statsItems];
+          const group = newGroups.find((g: any) => g.id === activeGroup.id);
+          group.items = arrayMove(group.items, activeItemIndex, overItemIndex);
+          setStatsItems(newGroups);
+        } else {
+          const newGroups = [...statsItems];
+          const activeGroupInNew = newGroups.find((g: any) => g.id === activeGroup.id);
+          const overGroupInNew = newGroups.find((g: any) => g.id === over.id) || newGroups.find((g: any) => g.items.find((i: any) => i.id === over.id));
+          const [item] = activeGroupInNew.items.splice(activeItemIndex, 1);
+          const overItemIndexInGroup = overGroupInNew.items.findIndex((i: any) => i.id === over.id);
+          overGroupInNew.items.splice(overItemIndexInGroup !== -1 ? overItemIndexInGroup : overGroupInNew.items.length, 0, item);
+          setStatsItems(newGroups);
+        }
+      }
+    }
   };
 
   const updateStatItem = (groupIndex: number, itemIndex: number, field: keyof StatItemConfig, value: any) => {
@@ -976,17 +1009,123 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
     setStatsItems(newGroups);
   };
 
-  const moveStatItem = (groupIndex: number, itemIndex: number, direction: 'up' | 'down') => {
-    const newGroups = [...statsItems];
-    const items = newGroups[groupIndex].items;
-    if (direction === 'up' && itemIndex === 0) return;
-    if (direction === 'down' && itemIndex === items.length - 1) return;
-    
-    const temp = items[itemIndex];
-    items[itemIndex] = items[itemIndex + (direction === 'up' ? -1 : 1)];
-    items[itemIndex + (direction === 'up' ? -1 : 1)] = temp;
-    setStatsItems(newGroups);
-  };
+
+function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateStatGroup, removeStatGroup, addStatItem, removeStatItem, updateStatItem, setFocusedInput }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 space-y-4">
+      <div className="flex items-center gap-4">
+        <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white">
+          <GripVertical className="w-5 h-5" />
+        </div>
+        <input
+          type="text"
+          value={group.title}
+          onChange={(e) => updateStatGroup(groupIdx, 'title', e.target.value)}
+          placeholder="Название блока"
+          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-bold"
+        />
+        <div className="relative w-40">
+          <select
+            value={group.icon}
+            onChange={(e) => updateStatGroup(groupIdx, 'icon', e.target.value)}
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+          >
+            {Object.keys(ICON_MAP).map(iconName => (
+              <option key={iconName} value={iconName}>{iconName}</option>
+            ))}
+          </select>
+        </div>
+        <button onClick={() => removeStatGroup(groupIdx)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0">
+          <Trash2 className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="space-y-2 pl-8 border-l-2 border-zinc-800/50 ml-2">
+        <SortableContext items={group.items.map((i: any) => i.id)} strategy={verticalListSortingStrategy}>
+          {group.items.map((item: any, itemIdx: number) => (
+            <SortableStatItem 
+              key={item.id} 
+              item={item} 
+              groupIdx={groupIdx} 
+              itemIdx={itemIdx} 
+              statsItems={statsItems}
+              setStatsItems={setStatsItems}
+              removeStatItem={removeStatItem}
+              updateStatItem={updateStatItem}
+              setFocusedInput={setFocusedInput}
+            />
+          ))}
+        </SortableContext>
+        <button
+          onClick={() => addStatItem(groupIdx)}
+          className="mt-2 px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+        >
+          <Plus className="w-3 h-3" />
+          Добавить атрибут
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div ref={setNodeRef} style={style} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3 flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white">
+          <GripVertical className="w-4 h-4" />
+        </div>
+        <input
+          type="text"
+          value={item.title}
+          onChange={(e) => updateStatItem(groupIdx, itemIdx, 'title', e.target.value)}
+          placeholder="Название атрибута"
+          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+        />
+        <select
+          value={item.format}
+          onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
+          className="w-24 bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1.5 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+        >
+          <option value="auto">Авто</option>
+          <option value="number">Число</option>
+          <option value="ratio">Дробь</option>
+          <option value="percent">Процент</option>
+          <option value="duration">Время</option>
+          <option value="duration_hours">Часы</option>
+          <option value="date">Дата</option>
+          <option value="distance">Дистанция</option>
+        </select>
+        <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={item.isHidden}
+            onChange={(e) => updateStatItem(groupIdx, itemIdx, 'isHidden', e.target.checked)}
+            className="rounded bg-zinc-900 border-zinc-800 text-emerald-500 focus:ring-emerald-500"
+          />
+          Скрыть
+        </label>
+        <button onClick={() => removeStatItem(groupIdx, itemIdx)} className="p-1.5 text-red-400 hover:text-red-300 transition-colors shrink-0">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+      <input
+        type="text"
+        value={item.formula}
+        onFocus={(e) => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, ref: e.target })}
+        onChange={(e) => updateStatItem(groupIdx, itemIdx, 'formula', e.target.value)}
+        placeholder="Формула"
+        className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
+      />
+    </div>
+  );
+}
 
   return (
     <motion.div
@@ -1136,157 +1275,39 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
             )}
 
             {activeTab === 'stats' && (
-              <>
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={statsItems.map(g => g.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
                   {statsItems.map((group, groupIdx) => (
-                    <div key={group.id} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex flex-col gap-1">
-                          <button onClick={() => moveStatGroup(groupIdx, 'up')} disabled={groupIdx === 0} className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronUp className="w-4 h-4" /></button>
-                          <button onClick={() => moveStatGroup(groupIdx, 'down')} disabled={groupIdx === statsItems.length - 1} className="p-1 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronDown className="w-4 h-4" /></button>
-                        </div>
-                        <input
-                          type="text"
-                          value={group.title}
-                          onChange={(e) => updateStatGroup(groupIdx, 'title', e.target.value)}
-                          placeholder="Название блока"
-                          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-bold"
-                        />
-                        <div className="relative w-40">
-                          <select
-                            value={group.icon}
-                            onChange={(e) => updateStatGroup(groupIdx, 'icon', e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-                          >
-                            {Object.keys(ICON_MAP).map(iconName => (
-                              <option key={iconName} value={iconName}>{iconName}</option>
-                            ))}
-                          </select>
-                          <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                            <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </div>
-                        <button onClick={() => removeStatGroup(groupIdx)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0">
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-
-                      <div className="space-y-2 pl-8 border-l-2 border-zinc-800/50 ml-2">
-                        {group.items.map((item, itemIdx) => (
-                          <div key={item.id} className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-3 flex flex-col gap-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex flex-col gap-1">
-                                <button onClick={() => moveStatItem(groupIdx, itemIdx, 'up')} disabled={itemIdx === 0} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronUp className="w-3 h-3" /></button>
-                                <button onClick={() => moveStatItem(groupIdx, itemIdx, 'down')} disabled={itemIdx === group.items.length - 1} className="p-0.5 text-zinc-500 hover:text-white disabled:opacity-30"><ChevronDown className="w-3 h-3" /></button>
-                              </div>
-                              <input
-                                type="text"
-                                value={item.title}
-                                onChange={(e) => updateStatItem(groupIdx, itemIdx, 'title', e.target.value)}
-                                placeholder="Название атрибута"
-                                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
-                              />
-                              <div className="relative w-32">
-                                <select
-                                  value={item.format}
-                                  onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
-                                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-                                >
-                                  <option value="auto">Авто</option>
-                                  <option value="number">Число</option>
-                                  <option value="ratio">Дробь (2.00)</option>
-                                  <option value="percent">Процент (%)</option>
-                                  <option value="duration">Время (дн. ч.)</option>
-                                  <option value="duration_hours">Время (часы)</option>
-                                  <option value="date">Дата</option>
-                                  <option value="distance">Дистанция</option>
-                                </select>
-                                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                                  <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </div>
-                              </div>
-                              <div className="relative w-32">
-                                <select
-                                  value={groupIdx}
-                                  onChange={(e) => {
-                                    const newGroupIdx = Number(e.target.value);
-                                    if (newGroupIdx !== groupIdx) {
-                                      const newGroups = [...statsItems];
-                                      const itemToMove = newGroups[groupIdx].items.splice(itemIdx, 1)[0];
-                                      newGroups[newGroupIdx].items.push(itemToMove);
-                                      setStatsItems(newGroups);
-                                    }
-                                  }}
-                                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-400 focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-                                >
-                                  {statsItems.map((g, gIdx) => (
-                                    <option key={g.id} value={gIdx}>{g.title || `Блок ${gIdx + 1}`}</option>
-                                  ))}
-                                </select>
-                                <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                                  <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                  </svg>
-                                </div>
-                              </div>
-                              <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={item.isHidden}
-                                  onChange={(e) => updateStatItem(groupIdx, itemIdx, 'isHidden', e.target.checked)}
-                                  className="rounded bg-zinc-900 border-zinc-800 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-950"
-                                />
-                                Скрыть
-                              </label>
-                              <button onClick={() => removeStatItem(groupIdx, itemIdx)} className="p-1.5 text-red-400 hover:text-red-300 transition-colors shrink-0">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                            <div className="flex gap-3 pl-6">
-                              <input
-                                type="text"
-                                value={item.formula}
-                                onFocus={(e) => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, ref: e.target })}
-                                onChange={(e) => updateStatItem(groupIdx, itemIdx, 'formula', e.target.value)}
-                                placeholder="Формула (напр. {kil} / {dea})"
-                                className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
-                              />
-                            </div>
-                          </div>
-                        ))}
-                        <button
-                          onClick={() => addStatItem(groupIdx)}
-                          className="mt-2 px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
-                        >
-                          <Plus className="w-3 h-3" />
-                          Добавить атрибут
-                        </button>
-                      </div>
-                    </div>
+                    <SortableStatGroup 
+                      key={group.id} 
+                      group={{...group, items: group.items.filter((i: any) => !i.isHidden)}} 
+                      groupIdx={groupIdx} 
+                      statsItems={statsItems}
+                      setStatsItems={setStatsItems}
+                      updateStatGroup={updateStatGroup}
+                      removeStatGroup={removeStatGroup}
+                      addStatItem={addStatItem}
+                      removeStatItem={removeStatItem}
+                      updateStatItem={updateStatItem}
+                      setFocusedInput={setFocusedInput}
+                    />
                   ))}
+                  
+                  {/* Hidden items block */}
+                  <div className="bg-red-950/20 border border-red-900/50 rounded-2xl p-4 space-y-4">
+                    <h3 className="text-red-400 font-bold text-sm">Скрытые атрибуты</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {statsItems.flatMap(g => g.items).filter(i => i.isHidden).map(item => (
+                        <div key={item.id} className="bg-red-900/20 border border-red-900/30 rounded-lg p-2 text-xs text-red-300">
+                          {item.title}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-
-                <div className="flex justify-between items-center border-t border-zinc-800 pt-6">
-                  <button
-                    onClick={addStatGroup}
-                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Добавить блок
-                  </button>
-                  <button
-                    onClick={() => onSave(items, statsItems)}
-                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
-                  >
-                    <Save className="w-4 h-4" />
-                    Сохранить настройки
-                  </button>
-                </div>
-              </>
+                </SortableContext>
+              </DndContext>
             )}
           </div>
 
