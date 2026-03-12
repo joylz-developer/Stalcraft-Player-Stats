@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, User, Shield, Crosshair, Activity, AlertCircle, MapPin, Loader2, 
@@ -45,6 +45,52 @@ interface UserData {
   id: string;
   username: string;
   role: string;
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
+  props!: { children: React.ReactNode };
+  state = { hasError: false, error: null };
+
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-red-500/30 rounded-2xl p-8 max-w-lg w-full text-center space-y-4">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto" />
+            <h1 className="text-2xl font-bold">Что-то пошло не так</h1>
+            <p className="text-zinc-400">
+              Произошла непредвиденная ошибка в работе приложения. Пожалуйста, перезагрузите страницу или обратитесь в поддержку.
+            </p>
+            {this.state.error && (
+              <div className="bg-zinc-950 p-4 rounded-lg text-left overflow-auto text-xs font-mono text-red-400 border border-red-500/20">
+                {this.state.error.message}
+              </div>
+            )}
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors"
+            >
+              Перезагрузить страницу
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 interface HighlightConfig {
@@ -324,7 +370,7 @@ export default function App() {
     try {
       const res = await axios.get('/api/settings/stats_config');
       if (res.data) {
-        setStatsConfig(res.data);
+        setStatsConfig(Array.isArray(res.data) ? res.data : (res.data.value || DEFAULT_STATS_CONFIG));
       } else {
         setStatsConfig(DEFAULT_STATS_CONFIG);
       }
@@ -421,11 +467,12 @@ export default function App() {
   const allianceInfo = profileData?.alliance ? ALLIANCE_MAP[profileData.alliance] : null;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
-      {/* Background effects */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/10 blur-[120px] rounded-full opacity-50" />
-      </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
+        {/* Background effects */}
+        <div className="fixed inset-0 z-0 pointer-events-none">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/10 blur-[120px] rounded-full opacity-50" />
+        </div>
 
       {/* Header / Auth */}
       <div className="relative z-20 flex justify-end p-4 gap-4">
@@ -526,23 +573,25 @@ export default function App() {
         
         <AnimatePresence mode="wait">
           {showAdmin && user?.role === 'admin' ? (
-            <AdminPanel 
-              config={highlightsConfig} 
-              statsConfig={statsConfig}
-              myCharacters={myCharacters}
-              onSave={async (newConfig, newStatsConfig) => {
-                try {
-                  await axios.post('/api/admin/highlights', newConfig);
-                  await axios.post('/api/admin/settings/stats_config', { value: newStatsConfig });
-                  setHighlightsConfig(newConfig);
-                  setStatsConfig(newStatsConfig);
-                  setShowAdmin(false);
-                } catch (e) {
-                  alert('Ошибка сохранения');
-                }
-              }} 
-              onClose={() => setShowAdmin(false)} 
-            />
+            <ErrorBoundary>
+              <AdminPanel 
+                config={highlightsConfig} 
+                statsConfig={statsConfig}
+                myCharacters={myCharacters}
+                onSave={async (newConfig, newStatsConfig) => {
+                  try {
+                    await axios.post('/api/admin/highlights', newConfig);
+                    await axios.post('/api/admin/settings/stats_config', newStatsConfig);
+                    setHighlightsConfig(newConfig);
+                    setStatsConfig(newStatsConfig);
+                    setShowAdmin(false);
+                  } catch (e) {
+                    alert('Ошибка сохранения');
+                  }
+                }} 
+                onClose={() => setShowAdmin(false)} 
+              />
+            </ErrorBoundary>
           ) : (
             <motion.div
               key="main"
@@ -788,6 +837,7 @@ export default function App() {
         </AnimatePresence>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
 
