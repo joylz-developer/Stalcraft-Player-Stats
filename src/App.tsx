@@ -1277,7 +1277,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
             {activeTab === 'stats' && (
               <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                 <SortableContext items={statsItems.map(g => g.id)} strategy={verticalListSortingStrategy}>
-                <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="space-y-6 pr-2">
                   {statsItems.map((group, groupIdx) => (
                     <SortableStatGroup 
                       key={group.id} 
@@ -1353,7 +1353,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
                 />
               </div>
 
-              <div className="space-y-1 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="space-y-1 pr-2">
                 {Object.entries(STAT_NAMES)
                   .filter(([key, name]) => 
                     key.toLowerCase().includes(attributeSearch.toLowerCase()) || 
