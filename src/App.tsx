@@ -47,7 +47,7 @@ interface HighlightConfig {
   title: string;
   formula: string;
   color: string;
-  format: 'number' | 'percent' | 'ratio';
+  format: 'number' | 'percent' | 'ratio' | 'duration';
 }
 
 const ALLIANCE_MAP: Record<string, { name: string, color: string, bg: string }> = {
@@ -629,6 +629,12 @@ export default function App() {
                             if (config.format === 'percent') displayVal = val.toFixed(1) + '%';
                             if (config.format === 'ratio') displayVal = val.toFixed(2);
                             if (config.format === 'number') displayVal = val.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+                            if (config.format === 'duration') {
+                              const hours = Math.floor(val / (1000 * 60 * 60));
+                              const days = Math.floor(hours / 24);
+                              const remHours = hours % 24;
+                              displayVal = `${days} д. ${remHours} ч.`;
+                            }
 
                             return (
                               <div key={idx} className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-4 text-center">
@@ -718,17 +724,19 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
   const [attributeSearch, setAttributeSearch] = useState('');
   const [previewData, setPreviewData] = useState<ProfileData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewCharIndex, setPreviewCharIndex] = useState(0);
 
   useEffect(() => {
-    if (activeTab === 'highlights' && myCharacters.length > 0 && !previewData && !previewLoading) {
-      const char = myCharacters[0];
+    if (activeTab === 'highlights' && myCharacters.length > 0) {
+      const char = myCharacters[previewCharIndex];
+      if (!char) return;
       setPreviewLoading(true);
       axios.get(`/api/profile/${char.region}/${encodeURIComponent(char.name)}`)
         .then(res => setPreviewData(res.data))
         .catch(err => console.error('Preview fetch error', err))
         .finally(() => setPreviewLoading(false));
     }
-  }, [activeTab, myCharacters]);
+  }, [activeTab, myCharacters, previewCharIndex]);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -874,6 +882,7 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
                           <option value="number">Число</option>
                           <option value="ratio">Дробь (2.00)</option>
                           <option value="percent">Процент (%)</option>
+                          <option value="duration">Время (дн. ч.)</option>
                         </select>
                         <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
                           <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -934,6 +943,25 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
                 {previewLoading && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
               </div>
               
+              {myCharacters.length > 0 && (
+                <div className="mb-3 relative">
+                  <select
+                    value={previewCharIndex}
+                    onChange={(e) => setPreviewCharIndex(Number(e.target.value))}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+                  >
+                    {myCharacters.map((char, idx) => (
+                      <option key={idx} value={idx}>{char.name} ({char.region})</option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                    <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+
               <div className="mb-3 relative">
                 <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                   <Search className="h-3 w-3 text-zinc-500" />
@@ -955,7 +983,8 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
                   )
                   .map(([key, name]) => {
                     const stat = previewData?.stats.find(s => s.id === key);
-                    const previewValue = stat ? formatStatValue(stat.id, stat.type, stat.value) : '—';
+                    const rawValue = stat ? stat.value : '—';
+                    const formattedValue = stat ? formatStatValue(stat.id, stat.type, stat.value) : '—';
                     
                     return (
                       <button
@@ -965,9 +994,14 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
                       >
                         <div className="flex justify-between items-start w-full mb-1">
                           <span className="font-mono text-emerald-500 font-bold group-hover/attr:scale-105 transition-transform">{"{" + key + "}"}</span>
-                          <span className="text-[10px] text-zinc-400 font-mono bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[100px] text-right" title={String(previewValue)}>
-                            {previewValue}
-                          </span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-[10px] text-zinc-300 font-mono bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[100px] text-right" title="Сырое значение (используется в формулах)">
+                              {String(rawValue)}
+                            </span>
+                            {stat?.type === 'DURATION' && (
+                              <span className="text-[9px] text-zinc-500 mt-0.5">{formattedValue}</span>
+                            )}
+                          </div>
                         </div>
                         <span className="text-zinc-500 truncate group-hover/attr:text-zinc-300">{name}</span>
                       </button>
@@ -975,7 +1009,7 @@ function AdminPanel({ config, myCharacters, onSave, onClose }: { config: Highlig
                 })}
               </div>
               <div className="mt-4 pt-4 border-t border-zinc-800 text-[10px] text-zinc-500 italic">
-                {previewData ? `Превью данных для: ${previewData.username}` : 'Нажмите на атрибут, чтобы вставить его в текущую формулу'}
+                В формулах используются сырые числовые значения.
               </div>
             </div>
           </div>
