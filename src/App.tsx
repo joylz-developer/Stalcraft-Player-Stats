@@ -1015,7 +1015,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
 
   const removeStatItem = (groupIndex: number, itemIndex: number) => {
     const newGroups = [...statsItems];
-    newGroups[groupIndex].items = newGroups[groupIndex].items.filter((_, i) => i !== itemIndex);
+    newGroups[groupIndex].items[itemIndex].isHidden = true;
     setStatsItems(newGroups);
   };
 
@@ -1048,26 +1048,29 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
             ))}
           </select>
         </div>
-        <button onClick={() => removeStatGroup(groupIdx)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0">
+        <button onClick={(e) => { e.preventDefault(); removeStatGroup(groupIdx); }} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0">
           <Trash2 className="w-5 h-5" />
         </button>
       </div>
 
       <div className="space-y-2 pl-8 border-l-2 border-zinc-800/50 ml-2">
         <SortableContext items={group.items.map((i: any) => i.id)} strategy={verticalListSortingStrategy}>
-          {group.items.map((item: any, itemIdx: number) => (
-            <SortableStatItem 
-              key={item.id} 
-              item={item} 
-              groupIdx={groupIdx} 
-              itemIdx={itemIdx} 
-              statsItems={statsItems}
-              setStatsItems={setStatsItems}
-              removeStatItem={removeStatItem}
-              updateStatItem={updateStatItem}
-              setFocusedInput={setFocusedInput}
-            />
-          ))}
+          {group.items.map((item: any) => {
+            const originalIndex = statsItems[groupIdx].items.findIndex((i: any) => i.id === item.id);
+            return (
+              <SortableStatItem 
+                key={item.id} 
+                item={item} 
+                groupIdx={groupIdx} 
+                itemIdx={originalIndex} 
+                statsItems={statsItems}
+                setStatsItems={setStatsItems}
+                removeStatItem={removeStatItem}
+                updateStatItem={updateStatItem}
+                setFocusedInput={setFocusedInput}
+              />
+            );
+          })}
         </SortableContext>
         <button
           onClick={() => addStatItem(groupIdx)}
@@ -1102,11 +1105,21 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           type="text"
           value={item.formula || ''}
           onChange={(e) => updateStatItem(groupIdx, itemIdx, 'formula', e.target.value)}
-          onFocus={() => setFocusedInput(item.id)}
+          onFocus={(e) => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, ref: e.target })}
           placeholder="Формула"
           className="w-40 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-1 focus:ring-emerald-500 outline-none"
         />
-        <button onClick={() => removeStatItem(groupIdx, itemIdx)} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
+        <select
+          value={item.format || 'number'}
+          onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
+          className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+        >
+          <option value="number">Число</option>
+          <option value="ratio">Дробь</option>
+          <option value="percent">Процент</option>
+          <option value="duration">Время</option>
+        </select>
+        <button onClick={(e) => { e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
