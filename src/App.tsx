@@ -288,8 +288,7 @@ function renderFormulaToHTML(formula: string) {
   if (!formula) return '';
   const escaped = formula.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return escaped.replace(/\{([^}]+)\}/g, (match, attr) => {
-    const name = STAT_NAMES[attr] || attr;
-    return `<span contenteditable="false" class="inline-flex items-center bg-emerald-500/20 text-emerald-400 rounded px-1.5 mx-0.5 text-xs font-bold select-none align-middle" title="${name}" data-attr="${attr}">${attr}</span>`;
+    return `<span contenteditable="false" class="inline-flex items-center bg-emerald-500/20 text-emerald-400 rounded px-1.5 mx-0.5 text-xs font-bold select-none align-middle cursor-help" data-attr="${attr}">${attr}</span>`;
   });
 }
 
@@ -1135,6 +1134,62 @@ function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedIn
   );
 }
 
+function AttributeTooltip({ previewData }: { previewData: ProfileData | null }) {
+  const [tooltip, setTooltip] = useState<{ visible: boolean, x: number, y: number, attr: string | null }>({ visible: false, x: 0, y: 0, attr: null });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && target.dataset && target.dataset.attr) {
+        setTooltip({
+          visible: true,
+          x: e.clientX,
+          y: e.clientY,
+          attr: target.dataset.attr
+        });
+      } else {
+        setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => document.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  if (!tooltip.visible || !tooltip.attr) return null;
+
+  const name = STAT_NAMES[tooltip.attr] || tooltip.attr;
+  const stat = previewData?.stats.find(s => s.id === tooltip.attr);
+  const rawValue = stat ? stat.value : '—';
+  const formattedValue = stat ? formatStatValue(stat.id, stat.type, stat.value) : '—';
+
+  const x = Math.min(tooltip.x + 15, window.innerWidth - 220);
+  const y = Math.min(tooltip.y + 15, window.innerHeight - 120);
+
+  return (
+    <div 
+      className="fixed z-[100] pointer-events-none bg-zinc-900 border border-zinc-700 shadow-xl rounded-lg p-3 text-sm flex flex-col gap-1 min-w-[200px]"
+      style={{ left: x, top: y }}
+    >
+      <div className="font-bold text-emerald-400 mb-1">{name}</div>
+      <div className="flex justify-between items-center text-xs">
+        <span className="text-zinc-500">ID:</span>
+        <span className="text-zinc-300 font-mono">{tooltip.attr}</span>
+      </div>
+      <div className="flex justify-between items-center text-xs">
+        <span className="text-zinc-500">Значение:</span>
+        <span className="text-zinc-300 font-mono">{String(rawValue)}</span>
+      </div>
+      {stat && (
+        <div className="flex justify-between items-center text-xs">
+          <span className="text-zinc-500">Формат:</span>
+          <span className="text-zinc-300 font-mono">{formattedValue}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { config: HighlightConfig[], statsConfig: StatGroupConfig[], myCharacters: any[], onSave: (c: HighlightConfig[], s: StatGroupConfig[]) => void, onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<'highlights' | 'stats' | 'users'>('highlights');
   const [items, setItems] = useState<HighlightConfig[]>(config.map((c, i) => ({ ...c, id: c.id || `h_${Date.now()}_${i}` })));
@@ -1145,19 +1200,31 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
   const [attributeSearch, setAttributeSearch] = useState('');
   const [previewData, setPreviewData] = useState<ProfileData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewCharIndex, setPreviewCharIndex] = useState(0);
+  const [previewNickname, setPreviewNickname] = useState('');
+  const [previewRegion, setPreviewRegion] = useState<Region>('ru');
 
   useEffect(() => {
-    if ((activeTab === 'highlights' || activeTab === 'stats') && myCharacters.length > 0) {
-      const char = myCharacters[previewCharIndex];
-      if (!char) return;
-      setPreviewLoading(true);
-      axios.get(`/api/profile/${char.region}/${encodeURIComponent(char.name)}`)
-        .then(res => setPreviewData(res.data))
-        .catch(err => console.error('Preview fetch error', err))
-        .finally(() => setPreviewLoading(false));
+    if (myCharacters.length > 0 && !previewNickname) {
+      setPreviewNickname(myCharacters[0].name);
+      setPreviewRegion(myCharacters[0].region);
     }
-  }, [activeTab, myCharacters, previewCharIndex]);
+  }, [myCharacters]);
+
+  useEffect(() => {
+    if ((activeTab === 'highlights' || activeTab === 'stats') && previewNickname) {
+      const timer = setTimeout(() => {
+        setPreviewLoading(true);
+        axios.get(`/api/profile/${previewRegion}/${encodeURIComponent(previewNickname)}`)
+          .then(res => setPreviewData(res.data))
+          .catch(err => {
+            console.error('Preview fetch error', err);
+            setPreviewData(null);
+          })
+          .finally(() => setPreviewLoading(false));
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, previewNickname, previewRegion]);
 
   useEffect(() => {
     if (activeTab === 'users') {
@@ -1321,12 +1388,14 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
 
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-6xl mx-auto shadow-2xl"
-    >
+    <>
+      <AttributeTooltip previewData={previewData} />
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-6xl mx-auto shadow-2xl"
+      >
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
@@ -1454,24 +1523,30 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                 {previewLoading && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
               </div>
               
-              {myCharacters.length > 0 && (
-                <div className="mb-3 relative">
+              <div className="mb-3 flex gap-2">
+                <input
+                  type="text"
+                  value={previewNickname}
+                  onChange={(e) => setPreviewNickname(e.target.value)}
+                  placeholder="Никнейм для предпросмотра"
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+                <div className="relative w-20 shrink-0">
                   <select
-                    value={previewCharIndex}
-                    onChange={(e) => setPreviewCharIndex(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+                    value={previewRegion}
+                    onChange={(e) => setPreviewRegion(e.target.value as Region)}
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-3 pr-6 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
                   >
-                    {myCharacters.map((char, idx) => (
-                      <option key={idx} value={idx}>{char.name} ({char.region})</option>
-                    ))}
+                    <option value="ru">RU</option>
+                    <option value="eu">EU</option>
+                    <option value="na">NA</option>
+                    <option value="sea">SEA</option>
                   </select>
                   <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                    <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
+                    <ChevronDown className="h-3 w-3 text-zinc-500" />
                   </div>
                 </div>
-              )}
+              </div>
 
               <div className="mb-3 relative">
                 <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
@@ -1588,5 +1663,6 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
         </div>
       )}
     </motion.div>
+    </>
   );
 }
