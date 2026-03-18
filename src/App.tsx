@@ -284,6 +284,107 @@ const evaluateFormula = (formula: string, stats: StatItem[]) => {
   }
 };
 
+function renderFormulaToHTML(formula: string) {
+  if (!formula) return '';
+  const escaped = formula.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return escaped.replace(/\{([^}]+)\}/g, (match, attr) => {
+    const name = STAT_NAMES[attr] || attr;
+    return `<span contenteditable="false" class="inline-flex items-center bg-emerald-500/20 text-emerald-400 rounded px-1.5 mx-0.5 text-xs font-bold select-none align-middle" title="${name}" data-attr="${attr}">${attr}</span>`;
+  });
+}
+
+function parseFormulaHTML(element: HTMLElement): string {
+  let result = '';
+  for (const node of Array.from(element.childNodes)) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      result += node.textContent;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      if (el.dataset.attr) {
+        result += `{${el.dataset.attr}}`;
+      } else {
+        result += parseFormulaHTML(el);
+      }
+    }
+  }
+  return result;
+}
+
+const FormulaInput = React.forwardRef(({ value, onChange, onFocus, onBlur, placeholder, className }: any, ref) => {
+  const divRef = React.useRef<HTMLDivElement>(null);
+  const lastSelection = React.useRef<Range | null>(null);
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      if (divRef.current?.contains(range.commonAncestorContainer)) {
+        lastSelection.current = range.cloneRange();
+      }
+    }
+  };
+
+  React.useEffect(() => {
+    if (divRef.current && document.activeElement !== divRef.current) {
+      divRef.current.innerHTML = renderFormulaToHTML(value);
+    }
+  }, [value]);
+
+  React.useImperativeHandle(ref, () => ({
+    insertAttribute: (attr: string) => {
+      if (!divRef.current) return;
+      divRef.current.focus();
+      if (lastSelection.current) {
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(lastSelection.current);
+      }
+      const html = renderFormulaToHTML(`{${attr}}`);
+      document.execCommand('insertHTML', false, html);
+      saveSelection();
+      onChange(parseFormulaHTML(divRef.current));
+    }
+  }));
+
+  const handleInput = () => {
+    if (divRef.current) {
+      saveSelection();
+      onChange(parseFormulaHTML(divRef.current));
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+    }
+  };
+
+  return (
+    <div
+      ref={divRef}
+      contentEditable
+      onInput={handleInput}
+      onPaste={handlePaste}
+      onKeyDown={handleKeyDown}
+      onFocus={onFocus}
+      onBlur={(e) => {
+        saveSelection();
+        if (onBlur) onBlur(e);
+      }}
+      onKeyUp={saveSelection}
+      onMouseUp={saveSelection}
+      className={cn("empty:before:content-[attr(data-placeholder)] empty:before:text-zinc-500 cursor-text whitespace-pre-wrap break-all", className)}
+      data-placeholder={placeholder}
+    />
+  );
+});
+
 export default function App() {
   const [region, setRegion] = useState<Region>('ru');
   const [nickname, setNickname] = useState('');
@@ -911,6 +1012,7 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
 function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput }: any) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
+  const formulaRef = React.useRef<any>(null);
 
   return (
     <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex gap-4 items-center">
@@ -925,13 +1027,13 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           placeholder="Название"
           className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
         />
-        <input
-          type="text"
+        <FormulaInput
+          ref={formulaRef}
           value={item.formula || ''}
-          onChange={(e) => updateStatItem(groupIdx, itemIdx, 'formula', e.target.value)}
-          onFocus={(e) => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, ref: e.target })}
+          onChange={(val: string) => updateStatItem(groupIdx, itemIdx, 'formula', val)}
+          onFocus={() => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, insert: (attr: string) => formulaRef.current?.insertAttribute(attr) })}
           placeholder="Формула"
-          className="w-40 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-1 focus:ring-emerald-500 outline-none"
+          className="w-40 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-1 focus:ring-emerald-500 outline-none overflow-y-auto max-h-20 min-h-[38px]"
         />
         <select
           value={item.format || 'auto'}
@@ -955,6 +1057,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
 function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput }: any) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
   const style = { transform: CSS.Transform.toString(transform), transition };
+  const formulaRef = React.useRef<any>(null);
 
   return (
     <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
@@ -1009,13 +1112,13 @@ function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedIn
           </div>
         </div>
         <div>
-          <input
-            type="text"
-            value={item.formula}
-            onFocus={(e) => setFocusedInput({ type: 'highlight', itemIndex: idx, ref: e.target })}
-            onChange={(e) => updateItem(idx, 'formula', e.target.value)}
+          <FormulaInput
+            ref={formulaRef}
+            value={item.formula || ''}
+            onFocus={() => setFocusedInput({ type: 'highlight', itemIndex: idx, insert: (attr: string) => formulaRef.current?.insertAttribute(attr) })}
+            onChange={(val: string) => updateItem(idx, 'formula', val)}
             placeholder="Формула (напр. {kil} / {dea})"
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono overflow-y-auto max-h-20 min-h-[38px]"
           />
           <p className="text-[10px] text-zinc-500 mt-1">
             Используйте ID статистики в фигурных скобках, например: <code className="text-emerald-400/70">{'{sho-hea} / {sho-hit} * 100'}</code>
@@ -1038,7 +1141,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
   const [statsItems, setStatsItems] = useState<StatGroupConfig[]>(statsConfig);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [focusedInput, setFocusedInput] = useState<{ type: 'highlight' | 'stat', groupIndex?: number, itemIndex: number, ref: HTMLInputElement | null } | null>(null);
+  const [focusedInput, setFocusedInput] = useState<{ type: 'highlight' | 'stat', groupIndex?: number, itemIndex: number, ref?: HTMLInputElement | null, insert?: (attr: string) => void } | null>(null);
   const [attributeSearch, setAttributeSearch] = useState('');
   const [previewData, setPreviewData] = useState<ProfileData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -1098,28 +1201,35 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
   };
 
   const insertAttribute = (key: string) => {
-    if (focusedInput === null || focusedInput.ref === null) return;
+    if (!focusedInput) return;
     
-    const input = focusedInput.ref;
-    const start = input.selectionStart || 0;
-    const end = input.selectionEnd || 0;
-    const text = input.value;
-    const attribute = `{${key}}`;
-    
-    const newValue = text.substring(0, start) + attribute + text.substring(end);
-    
-    if (focusedInput.type === 'highlight') {
-      updateItem(focusedInput.itemIndex, 'formula', newValue);
-    } else if (focusedInput.type === 'stat' && focusedInput.groupIndex !== undefined) {
-      updateStatItem(focusedInput.groupIndex, focusedInput.itemIndex, 'formula', newValue);
+    if (focusedInput.insert) {
+      focusedInput.insert(key);
+      return;
     }
     
-    // Restore focus and selection after state update
-    setTimeout(() => {
-      input.focus();
-      const newPos = start + attribute.length;
-      input.setSelectionRange(newPos, newPos);
-    }, 0);
+    // Fallback for old inputs if any
+    if (focusedInput.ref) {
+      const input = focusedInput.ref;
+      const start = input.selectionStart || 0;
+      const end = input.selectionEnd || 0;
+      const text = input.value;
+      const attribute = `{${key}}`;
+      
+      const newValue = text.substring(0, start) + attribute + text.substring(end);
+      
+      if (focusedInput.type === 'highlight') {
+        updateItem(focusedInput.itemIndex, 'formula', newValue);
+      } else if (focusedInput.type === 'stat' && focusedInput.groupIndex !== undefined) {
+        updateStatItem(focusedInput.groupIndex, focusedInput.itemIndex, 'formula', newValue);
+      }
+      
+      setTimeout(() => {
+        input.focus();
+        const newPos = start + attribute.length;
+        input.setSelectionRange(newPos, newPos);
+      }, 0);
+    }
   };
 
   const updateStatGroup = (groupIndex: number, field: keyof StatGroupConfig, value: any) => {
