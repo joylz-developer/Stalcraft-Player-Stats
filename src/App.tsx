@@ -5,7 +5,7 @@ import {
   Target, Skull, Coins, Map, Swords, Home, Trophy, Percent, Clock, Calendar,
   Settings, LogOut, Plus, Trash2, Save, ChevronUp, ChevronDown, GripVertical
 } from 'lucide-react';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import axios from 'axios';
@@ -949,13 +949,13 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
   const style = { 
     transform: CSS.Transform.toString(transform), 
     transition,
-    ...(isDragging ? { position: 'relative' as const, zIndex: 50 } : {})
+    ...(isDragging ? { position: 'relative' as const, zIndex: 50, opacity: 0.5 } : {})
   };
 
   return (
     <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 space-y-4">
       <div className="flex items-center gap-4">
-        <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white">
+        <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white touch-none">
           <GripVertical className="w-5 h-5" />
         </div>
         <input
@@ -1017,13 +1017,13 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
   const style = { 
     transform: CSS.Transform.toString(transform), 
     transition,
-    ...(isDragging ? { position: 'relative' as const, zIndex: 50 } : {})
+    ...(isDragging ? { position: 'relative' as const, zIndex: 50, opacity: 0.5 } : {})
   };
   const formulaRef = React.useRef<any>(null);
 
   return (
     <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex gap-4 items-center">
-      <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white">
+      <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white touch-none">
         <GripVertical className="w-5 h-5" />
       </div>
       <div className="flex-1 flex gap-4 items-center">
@@ -1066,13 +1066,13 @@ function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedIn
   const style = { 
     transform: CSS.Transform.toString(transform), 
     transition,
-    ...(isDragging ? { position: 'relative' as const, zIndex: 50 } : {})
+    ...(isDragging ? { position: 'relative' as const, zIndex: 50, opacity: 0.5 } : {})
   };
   const formulaRef = React.useRef<any>(null);
 
   return (
     <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
-      <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white mt-1 md:mt-0">
+      <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white mt-1 md:mt-0 touch-none">
         <GripVertical className="w-5 h-5" />
       </div>
       <div className="flex-1 space-y-3 w-full">
@@ -1326,7 +1326,11 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
   };
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -1454,7 +1458,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-4">
             {activeTab === 'highlights' && (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
                 <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
                   <div className="space-y-4 pr-2">
                     {items.map((item, idx) => (
@@ -1489,7 +1493,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
             )}
 
             {activeTab === 'stats' && (
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
                 <SortableContext items={statsItems.map(g => g.id)} strategy={verticalListSortingStrategy}>
                 <div className="space-y-6 pr-2">
                   {statsItems.map((group, groupIdx) => (
