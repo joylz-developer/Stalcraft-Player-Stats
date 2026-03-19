@@ -945,8 +945,12 @@ export default function App() {
 }
 
 function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateStatGroup, removeStatGroup, addStatItem, removeStatItem, updateStatItem, setFocusedInput }: any) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: group.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
+  const style = { 
+    transform: CSS.Transform.toString(transform), 
+    transition,
+    ...(isDragging ? { position: 'relative' as const, zIndex: 50 } : {})
+  };
 
   return (
     <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 space-y-4">
@@ -1009,8 +1013,12 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
 }
 
 function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput }: any) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const style = { 
+    transform: CSS.Transform.toString(transform), 
+    transition,
+    ...(isDragging ? { position: 'relative' as const, zIndex: 50 } : {})
+  };
   const formulaRef = React.useRef<any>(null);
 
   return (
@@ -1054,8 +1062,12 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
 }
 
 function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput }: any) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: item.id });
-  const style = { transform: CSS.Transform.toString(transform), transition };
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const style = { 
+    transform: CSS.Transform.toString(transform), 
+    transition,
+    ...(isDragging ? { position: 'relative' as const, zIndex: 50 } : {})
+  };
   const formulaRef = React.useRef<any>(null);
 
   return (
