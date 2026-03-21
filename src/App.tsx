@@ -6,7 +6,7 @@ import {
   Settings, LogOut, Plus, Trash2, Save, ChevronUp, ChevronDown, GripVertical
 } from 'lucide-react';
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import axios from 'axios';
 import { clsx, type ClassValue } from 'clsx';
@@ -952,59 +952,70 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
     ...(isDragging ? { position: 'relative' as const, zIndex: 50, opacity: 0.5 } : {})
   };
 
+  const Icon = ICON_MAP[group.icon as keyof typeof ICON_MAP] || Activity;
+
   return (
-    <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 space-y-4">
-      <div className="flex items-center gap-4">
-        <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white touch-none">
-          <GripVertical className="w-5 h-5" />
+    <div ref={setNodeRef} style={style} className="group/block bg-zinc-900/30 border border-zinc-800/50 rounded-3xl overflow-hidden flex flex-col relative h-full">
+      {/* Hover actions for the block */}
+      <div className="absolute top-4 right-4 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-2 bg-zinc-900/90 p-1 rounded-lg backdrop-blur-sm border border-zinc-800 z-10">
+        <div {...attributes} {...listeners} className="p-1.5 cursor-grab text-zinc-400 hover:text-white touch-none">
+          <GripVertical className="w-4 h-4" />
         </div>
-        <input
-          type="text"
-          value={group.title}
-          onChange={(e) => updateStatGroup(groupIdx, 'title', e.target.value)}
-          placeholder="Название блока"
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-bold"
-        />
-        <div className="relative w-40">
+        <button onClick={(e) => { e.preventDefault(); removeStatGroup(groupIdx); }} className="p-1.5 text-zinc-400 hover:text-red-400">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/50 flex items-center gap-3">
+        <div className="p-2 bg-zinc-800 rounded-xl relative group/icon">
+          <Icon className="h-5 w-5 text-emerald-500" />
           <select
             value={group.icon}
             onChange={(e) => updateStatGroup(groupIdx, 'icon', e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+            className="absolute inset-0 opacity-0 cursor-pointer"
           >
             {Object.keys(ICON_MAP).map(iconName => (
               <option key={iconName} value={iconName}>{iconName}</option>
             ))}
           </select>
         </div>
-        <button onClick={(e) => { e.preventDefault(); removeStatGroup(groupIdx); }} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0">
-          <Trash2 className="w-5 h-5" />
-        </button>
+        <input
+          type="text"
+          value={group.title}
+          onChange={(e) => updateStatGroup(groupIdx, 'title', e.target.value)}
+          placeholder="Название блока"
+          className="font-semibold text-zinc-100 bg-transparent border-none outline-none focus:ring-1 focus:ring-emerald-500/50 rounded px-1 w-full max-w-[200px]"
+        />
       </div>
-
-      <div className="space-y-2 pl-8 border-l-2 border-zinc-800/50 ml-2">
-        <SortableContext items={group.items.map((i: any) => i.id)} strategy={verticalListSortingStrategy}>
-          {group.items.map((item: any) => {
-            const originalIndex = statsItems[groupIdx].items.findIndex((i: any) => i.id === item.id);
-            return (
-              <SortableStatItem 
-                key={item.id} 
-                item={item} 
-                groupIdx={groupIdx} 
-                itemIdx={originalIndex} 
-                statsItems={statsItems}
-                setStatsItems={setStatsItems}
-                removeStatItem={removeStatItem}
-                updateStatItem={updateStatItem}
-                setFocusedInput={setFocusedInput}
-              />
-            );
-          })}
-        </SortableContext>
+      <div className="p-2 flex-1">
+        <table className="w-full text-sm">
+          <SortableContext items={group.items.map((i: any) => i.id)} strategy={verticalListSortingStrategy}>
+            <tbody className="flex flex-col w-full">
+              {group.items.map((item: any) => {
+                const originalIndex = statsItems[groupIdx].items.findIndex((i: any) => i.id === item.id);
+                return (
+                  <SortableStatItem 
+                    key={item.id} 
+                    item={item} 
+                    groupIdx={groupIdx} 
+                    itemIdx={originalIndex} 
+                    statsItems={statsItems}
+                    setStatsItems={setStatsItems}
+                    removeStatItem={removeStatItem}
+                    updateStatItem={updateStatItem}
+                    setFocusedInput={setFocusedInput}
+                    isLast={originalIndex === group.items.length - 1}
+                  />
+                );
+              })}
+            </tbody>
+          </SortableContext>
+        </table>
         <button
           onClick={() => addStatItem(groupIdx)}
-          className="mt-2 px-3 py-1.5 bg-zinc-800/50 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+          className="mt-2 w-full py-2 bg-zinc-800/30 hover:bg-zinc-800/50 text-zinc-400 hover:text-white rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1 border border-dashed border-zinc-700/50"
         >
-          <Plus className="w-3 h-3" />
+          <Plus className="w-4 h-4" />
           Добавить атрибут
         </button>
       </div>
@@ -1012,7 +1023,7 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
   );
 }
 
-function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput }: any) {
+function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput, isLast }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
@@ -1022,17 +1033,24 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
   const formulaRef = React.useRef<any>(null);
 
   return (
-    <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex gap-4 items-center">
-      <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white touch-none">
-        <GripVertical className="w-5 h-5" />
-      </div>
-      <div className="flex-1 flex gap-4 items-center">
+    <tr 
+      ref={setNodeRef} 
+      style={style} 
+      className={cn(
+        "group/item transition-colors hover:bg-zinc-800/30 relative flex w-full items-center",
+        !isLast && "border-b border-zinc-800/30"
+      )}
+    >
+      <td className="py-2 px-4 flex-1 flex items-center gap-2">
+        <div {...attributes} {...listeners} className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity">
+          <GripVertical className="w-4 h-4" />
+        </div>
         <input
           type="text"
           value={item.title}
           onChange={(e) => updateStatItem(groupIdx, itemIdx, 'title', e.target.value)}
           placeholder="Название"
-          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+          className="bg-transparent border-none outline-none text-zinc-400 focus:text-zinc-200 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 w-1/3"
         />
         <FormulaInput
           ref={formulaRef}
@@ -1040,12 +1058,12 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           onChange={(val: string) => updateStatItem(groupIdx, itemIdx, 'formula', val)}
           onFocus={() => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, insert: (attr: string) => formulaRef.current?.insertAttribute(attr) })}
           placeholder="Формула"
-          className="w-40 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-1 focus:ring-emerald-500 outline-none overflow-y-auto max-h-20 min-h-[38px]"
+          className="flex-1 bg-transparent border-none outline-none text-zinc-200 font-mono focus:ring-1 focus:ring-emerald-500/50 rounded px-1 text-right min-w-[100px] overflow-x-auto whitespace-nowrap custom-scrollbar"
         />
         <select
           value={item.format || 'auto'}
           onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
-          className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+          className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-400 focus:ring-1 focus:ring-emerald-500 outline-none w-20"
         >
           <option value="auto">Авто</option>
           <option value="number">Число</option>
@@ -1053,11 +1071,11 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           <option value="percent">Процент</option>
           <option value="duration">Время</option>
         </select>
-        <button onClick={(e) => { e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="p-2 text-zinc-500 hover:text-red-400 transition-colors">
+        <button onClick={(e) => { e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity p-1 text-zinc-500 hover:text-red-400">
           <Trash2 className="w-4 h-4" />
         </button>
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 }
 
@@ -1494,8 +1512,8 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
 
             {activeTab === 'stats' && (
               <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                <SortableContext items={statsItems.map(g => g.id)} strategy={verticalListSortingStrategy}>
-                <div className="space-y-6 pr-2">
+                <SortableContext items={statsItems.map(g => g.id)} strategy={rectSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pr-2">
                   {statsItems.map((group, groupIdx) => (
                     <SortableStatGroup 
                       key={group.id} 
@@ -1513,7 +1531,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                   ))}
                   
                   {/* Hidden items block */}
-                  <div className="bg-red-950/20 border border-red-900/50 rounded-2xl p-4 space-y-4">
+                  <div className="bg-red-950/20 border border-red-900/50 rounded-2xl p-4 space-y-4 md:col-span-2">
                     <h3 className="text-red-400 font-bold text-sm">Скрытые атрибуты</h3>
                     <div className="grid grid-cols-2 gap-2">
                       {statsItems.flatMap(g => g.items).filter(i => i.isHidden).map(item => (
