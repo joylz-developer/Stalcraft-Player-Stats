@@ -856,9 +856,9 @@ export default function App() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: groupIdx * 0.05 }}
-                            className="bg-zinc-900/30 border border-zinc-800/50 rounded-3xl overflow-hidden flex flex-col"
+                            className="bg-zinc-900/30 border border-zinc-800/50 rounded-3xl flex flex-col"
                           >
-                            <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/50 flex items-center gap-3">
+                            <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/50 flex items-center gap-3 rounded-t-3xl">
                               <div className="p-2 bg-zinc-800 rounded-xl">
                                 <Icon className="h-5 w-5 text-emerald-500" />
                               </div>
@@ -942,7 +942,7 @@ export default function App() {
   );
 }
 
-function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateStatGroup, removeStatGroup, addStatItem, removeStatItem, updateStatItem, setFocusedInput }: any) {
+function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateStatGroup, removeStatGroup, addStatItem, removeStatItem, updateStatItem, setFocusedInput, isEditMode, onEditItem }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
@@ -953,29 +953,33 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
   const Icon = ICON_MAP[group.icon as keyof typeof ICON_MAP] || Activity;
 
   return (
-    <div ref={setNodeRef} style={style} className="group/block bg-zinc-900/50 border border-zinc-800/50 rounded-3xl overflow-hidden flex flex-col relative h-full">
+    <div ref={setNodeRef} style={style} className="group/block bg-zinc-900/50 border border-zinc-800/50 rounded-3xl flex flex-col relative h-full">
       {/* Hover actions for the block */}
-      <div className="absolute top-4 right-4 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-2 bg-zinc-900/90 p-1 rounded-lg backdrop-blur-sm border border-zinc-800 z-10">
-        <div {...attributes} {...listeners} className="p-1.5 cursor-grab text-zinc-400 hover:text-white touch-none">
-          <GripVertical className="w-4 h-4" />
+      {isEditMode && (
+        <div className="absolute top-4 right-4 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-2 bg-zinc-900/90 p-1 rounded-lg backdrop-blur-sm border border-zinc-800 z-10">
+          <div {...attributes} {...listeners} className="p-1.5 cursor-grab text-zinc-400 hover:text-white touch-none">
+            <GripVertical className="w-4 h-4" />
+          </div>
+          <button onClick={(e) => { e.preventDefault(); removeStatGroup(groupIdx); }} className="p-1.5 text-zinc-400 hover:text-red-400">
+            <Trash2 className="w-4 h-4" />
+          </button>
         </div>
-        <button onClick={(e) => { e.preventDefault(); removeStatGroup(groupIdx); }} className="p-1.5 text-zinc-400 hover:text-red-400">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
+      )}
 
-      <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/50 flex items-center gap-3">
+      <div className="px-6 py-4 border-b border-zinc-800/50 bg-zinc-900/50 flex items-center gap-3 rounded-t-3xl">
         <div className="p-2 bg-zinc-800 rounded-xl relative group/icon">
           <Icon className="h-5 w-5 text-emerald-500" />
-          <select
-            value={group.icon}
-            onChange={(e) => updateStatGroup(groupIdx, 'icon', e.target.value)}
-            className="absolute inset-0 opacity-0 cursor-pointer"
-          >
-            {Object.keys(ICON_MAP).map(iconName => (
-              <option key={iconName} value={iconName}>{iconName}</option>
-            ))}
-          </select>
+          {isEditMode && (
+            <select
+              value={group.icon}
+              onChange={(e) => updateStatGroup(groupIdx, 'icon', e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            >
+              {Object.keys(ICON_MAP).map(iconName => (
+                <option key={iconName} value={iconName}>{iconName}</option>
+              ))}
+            </select>
+          )}
         </div>
         <input
           type="text"
@@ -983,6 +987,7 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
           onChange={(e) => updateStatGroup(groupIdx, 'title', e.target.value)}
           placeholder="Название блока"
           className="font-semibold text-zinc-100 bg-transparent border-none outline-none focus:ring-1 focus:ring-emerald-500/50 rounded px-1 w-full max-w-[200px]"
+          readOnly={!isEditMode}
         />
       </div>
       <div className="p-2 flex-1">
@@ -1003,163 +1008,109 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
                     updateStatItem={updateStatItem}
                     setFocusedInput={setFocusedInput}
                     isLast={originalIndex === group.items.length - 1}
+                    isEditMode={isEditMode}
+                    onEditItem={onEditItem}
                   />
                 );
               })}
             </div>
           </SortableContext>
         </div>
-        <button
-          onClick={() => addStatItem(groupIdx)}
-          className="mt-2 w-full py-2 bg-zinc-800/30 hover:bg-zinc-800/50 text-zinc-400 hover:text-white rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1 border border-dashed border-zinc-700/50"
-        >
-          <Plus className="w-4 h-4" />
-          Добавить атрибут
-        </button>
+        {isEditMode && (
+          <button
+            onClick={() => addStatItem(groupIdx)}
+            className="mt-2 w-full py-2 bg-zinc-800/30 hover:bg-zinc-800/50 text-zinc-400 hover:text-white rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1 border border-dashed border-zinc-700/50"
+          >
+            <Plus className="w-4 h-4" />
+            Добавить атрибут
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput, isLast }: any) {
+function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput, isLast, isEditMode, onEditItem }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
     transition,
     ...(isDragging ? { position: 'relative' as const, zIndex: 50, opacity: 0.5 } : {})
   };
-  const formulaRef = React.useRef<any>(null);
 
   return (
     <div 
       ref={setNodeRef} 
       style={style} 
+      onDoubleClick={() => onEditItem(item, groupIdx, itemIdx)}
       className={cn(
-        "group/item transition-colors hover:bg-zinc-800/30 relative flex w-full items-center",
+        "group/item transition-colors hover:bg-zinc-800/30 relative flex w-full items-center cursor-pointer",
         !isLast && "border-b border-zinc-800/30"
       )}
     >
       <div className="py-2 px-4 w-full flex items-center justify-between gap-2">
-        <div {...attributes} {...listeners} className="absolute left-1 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity shrink-0 bg-zinc-900/80 p-1 rounded backdrop-blur-sm z-10">
-          <GripVertical className="w-4 h-4" />
+        {isEditMode && (
+          <div {...attributes} {...listeners} className="absolute left-1 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity shrink-0 bg-zinc-900/80 p-1 rounded backdrop-blur-sm z-10">
+            <GripVertical className="w-4 h-4" />
+          </div>
+        )}
+        <div className="text-zinc-400 break-words flex-1 pl-4">
+          {item.title || 'Без названия'}
         </div>
-        <input
-          type="text"
-          value={item.title}
-          onChange={(e) => updateStatItem(groupIdx, itemIdx, 'title', e.target.value)}
-          placeholder="Название"
-          className="bg-transparent border-none outline-none text-zinc-400 focus:text-zinc-200 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 min-w-0 flex-1 truncate"
-        />
-        <FormulaInput
-          ref={formulaRef}
-          value={item.formula || ''}
-          onChange={(val: string) => updateStatItem(groupIdx, itemIdx, 'formula', val)}
-          onFocus={() => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, insert: (attr: string) => formulaRef.current?.insertAttribute(attr) })}
-          placeholder="Формула"
-          className="bg-transparent border-none outline-none text-zinc-200 font-mono focus:ring-1 focus:ring-emerald-500/50 rounded px-1 text-right min-w-0 flex-1 overflow-x-auto whitespace-nowrap custom-scrollbar"
-        />
-        <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-1 bg-zinc-900/90 p-1 rounded-lg backdrop-blur-sm border border-zinc-800 z-10">
-          <select
-            value={item.format || 'auto'}
-            onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
-            className="bg-transparent border-none text-xs text-zinc-400 focus:ring-1 focus:ring-emerald-500 outline-none w-20 shrink-0"
-          >
-            <option value="auto" className="bg-zinc-900">Авто</option>
-            <option value="number" className="bg-zinc-900">Число</option>
-            <option value="ratio" className="bg-zinc-900">Дробь</option>
-            <option value="percent" className="bg-zinc-900">Процент</option>
-            <option value="duration" className="bg-zinc-900">Время</option>
-          </select>
-          <button onClick={(e) => { e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="p-1 text-zinc-500 hover:text-red-400 shrink-0">
-            <Trash2 className="w-4 h-4" />
-          </button>
+        <div className="text-zinc-500 font-mono text-xs break-words flex-1 text-right pr-4">
+          {item.formula || 'Нет формулы'}
         </div>
+        {isEditMode && (
+          <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-1 bg-zinc-900/90 p-1 rounded-lg backdrop-blur-sm border border-zinc-800 z-10">
+            <button onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="p-1 text-zinc-500 hover:text-red-400 shrink-0">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput }: any) {
+function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput, isEditMode, onEditItem }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
     transition,
     ...(isDragging ? { position: 'relative' as const, zIndex: 50, opacity: 0.5 } : {})
   };
-  const formulaRef = React.useRef<any>(null);
 
   return (
-    <div ref={setNodeRef} style={style} className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
-      <div {...attributes} {...listeners} className="cursor-grab text-zinc-500 hover:text-white mt-1 md:mt-0 touch-none">
-        <GripVertical className="w-5 h-5" />
-      </div>
-      <div className="flex-1 space-y-3 w-full">
-        <div className="flex gap-3">
-          <input
-            type="text"
-            value={item.title}
-            onChange={(e) => updateItem(idx, 'title', e.target.value)}
-            placeholder="Название (напр. K/D)"
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none"
-          />
-          <div className="relative w-40">
-            <select
-              value={item.color}
-              onChange={(e) => updateItem(idx, 'color', e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-            >
-              <option value="text-white">Белый</option>
-              <option value="text-emerald-400">Изумрудный</option>
-              <option value="text-blue-400">Синий</option>
-              <option value="text-amber-400">Желтый</option>
-              <option value="text-red-400">Красный</option>
-              <option value="text-purple-400">Фиолетовый</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-              <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
-          <div className="relative w-32">
-            <select
-              value={item.format}
-              onChange={(e) => updateItem(idx, 'format', e.target.value as any)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-            >
-              <option value="number">Число</option>
-              <option value="ratio">Дробь (2.00)</option>
-              <option value="percent">Процент (%)</option>
-              <option value="duration">Время (дн. ч.)</option>
-              <option value="duration_hours">Время (часы)</option>
-            </select>
-            <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-              <svg className="h-3 w-3 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      onDoubleClick={() => onEditItem(item, null, idx)}
+      className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center cursor-pointer hover:border-zinc-700 transition-colors relative group/hl"
+    >
+      {isEditMode && (
+        <div {...attributes} {...listeners} className="absolute left-2 opacity-0 group-hover/hl:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity bg-zinc-900/80 p-1 rounded backdrop-blur-sm z-10">
+          <GripVertical className="w-5 h-5" />
         </div>
-        <div>
-          <FormulaInput
-            ref={formulaRef}
-            value={item.formula || ''}
-            onFocus={() => setFocusedInput({ type: 'highlight', itemIndex: idx, insert: (attr: string) => formulaRef.current?.insertAttribute(attr) })}
-            onChange={(val: string) => updateItem(idx, 'formula', val)}
-            placeholder="Формула (напр. {kil} / {dea})"
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:ring-1 focus:ring-emerald-500 outline-none font-mono overflow-y-auto max-h-20 min-h-[38px]"
-          />
-          <p className="text-[10px] text-zinc-500 mt-1">
-            Используйте ID статистики в фигурных скобках, например: <code className="text-emerald-400/70">{'{sho-hea} / {sho-hit} * 100'}</code>
-          </p>
+      )}
+      
+      <div className="flex-1 flex items-center justify-between w-full pl-6 pr-8">
+        <div className="flex items-center gap-4">
+          <div className={cn("w-3 h-3 rounded-full", item.color ? item.color.replace('text-', 'bg-') : 'bg-white')} />
+          <span className="text-zinc-300 font-medium">{item.title || 'Без названия'}</span>
+        </div>
+        <div className="text-zinc-500 font-mono text-xs break-words max-w-[200px]">
+          {item.formula || 'Нет формулы'}
         </div>
       </div>
-      <button
-        onClick={(e) => { e.preventDefault(); removeItem(idx); }}
-        className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors shrink-0"
-      >
-        <Trash2 className="w-5 h-5" />
-      </button>
+
+      {isEditMode && (
+        <button 
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeItem(idx); }} 
+          className="absolute right-4 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors opacity-0 group-hover/hl:opacity-100"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
     </div>
   );
 }
@@ -1220,6 +1171,255 @@ function AttributeTooltip({ previewData }: { previewData: ProfileData | null }) 
   );
 }
 
+function EditAttributeModal({ 
+  item, 
+  onSave, 
+  onClose, 
+  previewLoading, 
+  previewNickname, 
+  setPreviewNickname, 
+  previewRegion, 
+  setPreviewRegion, 
+  attributeSearch, 
+  setAttributeSearch, 
+  previewData 
+}: any) {
+  const [editedItem, setEditedItem] = useState(item);
+  const formulaRef = React.useRef<any>(null);
+
+  const handleInsert = (attr: string) => {
+    formulaRef.current?.insertAttribute(attr);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 w-full max-w-5xl flex flex-col lg:flex-row gap-6 max-h-[90vh]">
+        
+        {/* Left side: Edit Form */}
+        <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+          <div>
+            <h2 className="text-xl font-bold text-white mb-1">Редактирование атрибута</h2>
+            <p className="text-sm text-zinc-400">Настройте название, формулу и формат отображения.</p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Название</label>
+              <input
+                type="text"
+                value={editedItem.title}
+                onChange={(e) => setEditedItem({ ...editedItem, title: e.target.value })}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+                placeholder="Например: K/D"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-1">Формула расчета</label>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 min-h-[100px]">
+                <FormulaInput
+                  ref={formulaRef}
+                  value={editedItem.formula || ''}
+                  onChange={(val: string) => setEditedItem({ ...editedItem, formula: val })}
+                  placeholder="Введите формулу (напр. {kills} / {deaths})"
+                  className="text-white font-mono text-sm outline-none"
+                />
+              </div>
+              <p className="text-xs text-zinc-500 mt-2">
+                Используйте подсказки справа для вставки атрибутов. Вы можете использовать математические операторы (+, -, *, /).
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">Формат отображения</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: 'auto', label: 'Автоматически' },
+                  { value: 'number', label: 'Число' },
+                  { value: 'ratio', label: 'Дробь (2 знака)' },
+                  { value: 'percent', label: 'Процент' },
+                  { value: 'duration', label: 'Время (Дни и часы)' },
+                  { value: 'duration_hours', label: 'Время (Только часы)' },
+                  { value: 'date', label: 'Дата' },
+                  { value: 'distance', label: 'Дистанция (км)' }
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setEditedItem({ ...editedItem, format: opt.value })}
+                    className={cn(
+                      "px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left border",
+                      editedItem.format === opt.value 
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/50" 
+                        : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-300"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {editedItem.color !== undefined && (
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Цвет акцента</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { value: 'text-white', label: 'Белый', bg: 'bg-white' },
+                    { value: 'text-emerald-400', label: 'Изумрудный', bg: 'bg-emerald-400' },
+                    { value: 'text-blue-400', label: 'Синий', bg: 'bg-blue-400' },
+                    { value: 'text-amber-400', label: 'Желтый', bg: 'bg-amber-400' },
+                    { value: 'text-red-400', label: 'Красный', bg: 'bg-red-400' },
+                    { value: 'text-purple-400', label: 'Фиолетовый', bg: 'bg-purple-400' }
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setEditedItem({ ...editedItem, color: opt.value })}
+                      className={cn(
+                        "px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 border",
+                        editedItem.color === opt.value 
+                          ? "bg-zinc-800 text-white border-zinc-600" 
+                          : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-300"
+                      )}
+                    >
+                      <div className={cn("w-2 h-2 rounded-full", opt.bg)} />
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={() => onSave(editedItem)}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-emerald-900/20"
+            >
+              Сохранить изменения
+            </button>
+          </div>
+        </div>
+
+        {/* Right side: Attribute Sidebar */}
+        <div className="w-full lg:w-80 shrink-0 border-t lg:border-t-0 lg:border-l border-zinc-800 pt-6 lg:pt-0 lg:pl-6">
+          <AttributeSidebar 
+            previewLoading={previewLoading}
+            previewNickname={previewNickname}
+            setPreviewNickname={setPreviewNickname}
+            previewRegion={previewRegion}
+            setPreviewRegion={setPreviewRegion}
+            attributeSearch={attributeSearch}
+            setAttributeSearch={setAttributeSearch}
+            previewData={previewData}
+            focusedInput={{ insert: handleInsert }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AttributeSidebar({ 
+  previewLoading, 
+  previewNickname, 
+  setPreviewNickname, 
+  previewRegion, 
+  setPreviewRegion, 
+  attributeSearch, 
+  setAttributeSearch, 
+  previewData, 
+  focusedInput 
+}: any) {
+  return (
+    <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 sticky top-4 h-full max-h-[calc(100vh-2rem)] flex flex-col">
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <div className="flex items-center gap-2">
+          <Activity className="w-4 h-4 text-emerald-500" />
+          <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Атрибуты</h3>
+        </div>
+        {previewLoading && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+      </div>
+      
+      <div className="mb-3 flex gap-2 shrink-0">
+        <input
+          type="text"
+          value={previewNickname}
+          onChange={(e) => setPreviewNickname(e.target.value)}
+          placeholder="Никнейм для предпросмотра"
+          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none"
+        />
+        <div className="relative w-20 shrink-0">
+          <select
+            value={previewRegion}
+            onChange={(e) => setPreviewRegion(e.target.value as Region)}
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-3 pr-6 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
+          >
+            <option value="ru">RU</option>
+            <option value="eu">EU</option>
+            <option value="na">NA</option>
+            <option value="sea">SEA</option>
+          </select>
+          <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+            <ChevronDown className="h-3 w-3 text-zinc-500" />
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-3 relative shrink-0">
+        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+          <Search className="h-3 w-3 text-zinc-500" />
+        </div>
+        <input
+          type="text"
+          placeholder="Поиск атрибута..."
+          value={attributeSearch}
+          onChange={(e) => setAttributeSearch(e.target.value)}
+          className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+        />
+      </div>
+
+      <div className="space-y-1 overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-0">
+        {Object.entries(STAT_NAMES)
+          .filter(([key, name]) => 
+            key.toLowerCase().includes(attributeSearch.toLowerCase()) || 
+            name.toLowerCase().includes(attributeSearch.toLowerCase())
+          )
+          .map(([key, name]) => {
+            const stat = previewData?.stats.find((s: any) => s.id === key);
+            return (
+              <div 
+                key={key} 
+                onClick={() => {
+                  if (focusedInput?.insert) {
+                    focusedInput.insert(key);
+                  }
+                }}
+                className="group flex flex-col p-2 rounded-lg hover:bg-zinc-900 cursor-pointer transition-colors border border-transparent hover:border-zinc-800"
+              >
+                <div className="flex justify-between items-start">
+                  <span className="text-xs font-medium text-zinc-300 group-hover:text-emerald-400 transition-colors">{name}</span>
+                  <span className="text-[10px] text-zinc-600 font-mono bg-zinc-900/50 px-1.5 py-0.5 rounded">{key}</span>
+                </div>
+                {stat && (
+                  <div className="mt-1 text-xs text-zinc-500 flex justify-between">
+                    <span>Значение:</span>
+                    <span className="font-mono text-zinc-400">{formatStatValue(stat.id, stat.type, stat.value)}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+      </div>
+    </div>
+  );
+}
+
 function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { config: HighlightConfig[], statsConfig: StatGroupConfig[], myCharacters: any[], onSave: (c: HighlightConfig[], s: StatGroupConfig[]) => void, onClose: () => void }) {
   const [activeTab, setActiveTab] = useState<'highlights' | 'stats' | 'users'>('highlights');
   const [items, setItems] = useState<HighlightConfig[]>(config.map((c, i) => ({ ...c, id: c.id || `h_${Date.now()}_${i}` })));
@@ -1232,6 +1432,12 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewNickname, setPreviewNickname] = useState('');
   const [previewRegion, setPreviewRegion] = useState<Region>('ru');
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingItem, setEditingItem] = useState<{ groupIdx: number | null, itemIdx: number, item: any } | null>(null);
+
+  const onEditItem = (item: any, groupIdx: number | null, itemIdx: number) => {
+    setEditingItem({ item, groupIdx, itemIdx });
+  };
 
   useEffect(() => {
     if (myCharacters.length > 0 && !previewNickname) {
@@ -1487,18 +1693,33 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                         updateItem={updateItem}
                         removeItem={removeItem}
                         setFocusedInput={setFocusedInput}
+                        isEditMode={isEditMode}
+                        onEditItem={onEditItem}
                       />
                     ))}
                   </div>
                 </SortableContext>
                 <div className="flex justify-between items-center border-t border-zinc-800 pt-6 mt-4">
-                  <button
-                    onClick={addItem}
-                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Добавить показатель
-                  </button>
+                  <div className="flex items-center gap-4">
+                    {isEditMode && (
+                      <button
+                        onClick={addItem}
+                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Добавить показатель
+                      </button>
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isEditMode} 
+                        onChange={(e) => setIsEditMode(e.target.value === 'on' ? !isEditMode : e.target.checked)} 
+                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-950"
+                      />
+                      <span className="text-sm text-zinc-300">Режим редактирования структуры</span>
+                    </label>
+                  </div>
                   <button
                     onClick={() => onSave(items, statsItems)}
                     className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
@@ -1527,6 +1748,8 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                       removeStatItem={removeStatItem}
                       updateStatItem={updateStatItem}
                       setFocusedInput={setFocusedInput}
+                      isEditMode={isEditMode}
+                      onEditItem={onEditItem}
                     />
                   ))}
                   
@@ -1543,95 +1766,37 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                   </div>
                 </div>
                 </SortableContext>
+                <div className="flex justify-between items-center border-t border-zinc-800 pt-6 mt-4">
+                  <div className="flex items-center gap-4">
+                    {isEditMode && (
+                      <button
+                        onClick={addStatGroup}
+                        className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Добавить блок
+                      </button>
+                    )}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={isEditMode} 
+                        onChange={(e) => setIsEditMode(e.target.value === 'on' ? !isEditMode : e.target.checked)} 
+                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-950"
+                      />
+                      <span className="text-sm text-zinc-300">Режим редактирования структуры</span>
+                    </label>
+                  </div>
+                  <button
+                    onClick={() => onSave(items, statsItems)}
+                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+                  >
+                    <Save className="w-4 h-4" />
+                    Сохранить настройки
+                  </button>
+                </div>
               </DndContext>
             )}
-          </div>
-
-          <div className="w-full lg:w-72 shrink-0">
-            <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 sticky top-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-emerald-500" />
-                  <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Атрибуты</h3>
-                </div>
-                {previewLoading && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
-              </div>
-              
-              <div className="mb-3 flex gap-2">
-                <input
-                  type="text"
-                  value={previewNickname}
-                  onChange={(e) => setPreviewNickname(e.target.value)}
-                  placeholder="Никнейм для предпросмотра"
-                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none"
-                />
-                <div className="relative w-20 shrink-0">
-                  <select
-                    value={previewRegion}
-                    onChange={(e) => setPreviewRegion(e.target.value as Region)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-3 pr-6 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none appearance-none cursor-pointer"
-                  >
-                    <option value="ru">RU</option>
-                    <option value="eu">EU</option>
-                    <option value="na">NA</option>
-                    <option value="sea">SEA</option>
-                  </select>
-                  <div className="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
-                    <ChevronDown className="h-3 w-3 text-zinc-500" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mb-3 relative">
-                <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                  <Search className="h-3 w-3 text-zinc-500" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Поиск атрибута..."
-                  value={attributeSearch}
-                  onChange={(e) => setAttributeSearch(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
-                />
-              </div>
-
-              <div className="space-y-1 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
-                {Object.entries(STAT_NAMES)
-                  .filter(([key, name]) => 
-                    key.toLowerCase().includes(attributeSearch.toLowerCase()) || 
-                    name.toLowerCase().includes(attributeSearch.toLowerCase())
-                  )
-                  .map(([key, name]) => {
-                    const stat = previewData?.stats.find(s => s.id === key);
-                    const rawValue = stat ? stat.value : '—';
-                    const formattedValue = stat ? formatStatValue(stat.id, stat.type, stat.value) : '—';
-                    
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => insertAttribute(key)}
-                        className="w-full text-left px-3 py-2 rounded-lg hover:bg-emerald-500/10 text-[11px] transition-all flex flex-col group/attr"
-                      >
-                        <div className="flex justify-between items-start w-full mb-1">
-                          <span className="font-mono text-emerald-500 font-bold group-hover/attr:scale-105 transition-transform">{"{" + key + "}"}</span>
-                          <div className="flex flex-col items-end">
-                            <span className="text-[10px] text-zinc-300 font-mono bg-zinc-900/80 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[100px] text-right" title="Сырое значение (используется в формулах)">
-                              {String(rawValue)}
-                            </span>
-                            {stat?.type === 'DURATION' && (
-                              <span className="text-[9px] text-zinc-500 mt-0.5">{formattedValue}</span>
-                            )}
-                          </div>
-                        </div>
-                        <span className="text-zinc-500 truncate group-hover/attr:text-zinc-300">{name}</span>
-                      </button>
-                    );
-                })}
-              </div>
-              <div className="mt-4 pt-4 border-t border-zinc-800 text-[10px] text-zinc-500 italic">
-                В формулах используются сырые числовые значения.
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -1695,6 +1860,33 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
             </div>
           )}
         </div>
+      )}
+
+      {editingItem && (
+        <EditAttributeModal
+          item={editingItem}
+          onSave={(updatedItem: any) => {
+            // Update the item in statsItems or items
+            if (activeTab === 'stats') {
+              setStatsItems(statsItems.map(group => ({
+                ...group,
+                items: group.items.map(i => i.id === updatedItem.id ? updatedItem : i)
+              })));
+            } else {
+              setItems(items.map(i => i.id === updatedItem.id ? updatedItem : i));
+            }
+            setEditingItem(null);
+          }}
+          onClose={() => setEditingItem(null)}
+          previewLoading={previewLoading}
+          previewNickname={previewNickname}
+          setPreviewNickname={setPreviewNickname}
+          previewRegion={previewRegion}
+          setPreviewRegion={setPreviewRegion}
+          attributeSearch={attributeSearch}
+          setAttributeSearch={setAttributeSearch}
+          previewData={previewData}
+        />
       )}
     </motion.div>
     </>
