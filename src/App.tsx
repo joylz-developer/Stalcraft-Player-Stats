@@ -672,7 +672,7 @@ export default function App() {
         )}
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+      <div className={cn("relative z-10 mx-auto px-4 py-8 sm:px-6 lg:px-8", showAdmin && user?.role === 'admin' ? "w-full max-w-none" : "max-w-6xl")}>
         
         <AnimatePresence mode="wait">
           {showAdmin && user?.role === 'admin' ? (
@@ -955,7 +955,7 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
   const Icon = ICON_MAP[group.icon as keyof typeof ICON_MAP] || Activity;
 
   return (
-    <div ref={setNodeRef} style={style} className="group/block bg-zinc-900/30 border border-zinc-800/50 rounded-3xl overflow-hidden flex flex-col relative h-full">
+    <div ref={setNodeRef} style={style} className="group/block bg-zinc-900/50 border border-zinc-800/50 rounded-3xl overflow-hidden flex flex-col relative h-full">
       {/* Hover actions for the block */}
       <div className="absolute top-4 right-4 opacity-0 group-hover/block:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-2 bg-zinc-900/90 p-1 rounded-lg backdrop-blur-sm border border-zinc-800 z-10">
         <div {...attributes} {...listeners} className="p-1.5 cursor-grab text-zinc-400 hover:text-white touch-none">
@@ -1041,8 +1041,8 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
         !isLast && "border-b border-zinc-800/30"
       )}
     >
-      <td className="py-2 px-4 flex-1 flex items-center gap-2">
-        <div {...attributes} {...listeners} className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity">
+      <td className="py-2 px-4 w-full flex items-center gap-2">
+        <div {...attributes} {...listeners} className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity shrink-0">
           <GripVertical className="w-4 h-4" />
         </div>
         <input
@@ -1050,7 +1050,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           value={item.title}
           onChange={(e) => updateStatItem(groupIdx, itemIdx, 'title', e.target.value)}
           placeholder="Название"
-          className="bg-transparent border-none outline-none text-zinc-400 focus:text-zinc-200 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 w-1/3"
+          className="bg-transparent border-none outline-none text-zinc-400 focus:text-zinc-200 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 min-w-0 flex-1"
         />
         <FormulaInput
           ref={formulaRef}
@@ -1058,12 +1058,12 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           onChange={(val: string) => updateStatItem(groupIdx, itemIdx, 'formula', val)}
           onFocus={() => setFocusedInput({ type: 'stat', groupIndex: groupIdx, itemIndex: itemIdx, insert: (attr: string) => formulaRef.current?.insertAttribute(attr) })}
           placeholder="Формула"
-          className="flex-1 bg-transparent border-none outline-none text-zinc-200 font-mono focus:ring-1 focus:ring-emerald-500/50 rounded px-1 text-right min-w-[100px] overflow-x-auto whitespace-nowrap custom-scrollbar"
+          className="bg-transparent border-none outline-none text-zinc-200 font-mono focus:ring-1 focus:ring-emerald-500/50 rounded px-1 text-right min-w-0 flex-1 overflow-x-auto whitespace-nowrap custom-scrollbar"
         />
         <select
           value={item.format || 'auto'}
           onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
-          className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-400 focus:ring-1 focus:ring-emerald-500 outline-none w-20"
+          className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-400 focus:ring-1 focus:ring-emerald-500 outline-none w-20 shrink-0"
         >
           <option value="auto">Авто</option>
           <option value="number">Число</option>
@@ -1071,7 +1071,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           <option value="percent">Процент</option>
           <option value="duration">Время</option>
         </select>
-        <button onClick={(e) => { e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity p-1 text-zinc-500 hover:text-red-400">
+        <button onClick={(e) => { e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity p-1 text-zinc-500 hover:text-red-400 shrink-0">
           <Trash2 className="w-4 h-4" />
         </button>
       </td>
@@ -1428,7 +1428,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
-        className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 max-w-6xl mx-auto shadow-2xl"
+        className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 w-full shadow-2xl"
       >
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -1513,7 +1513,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
             {activeTab === 'stats' && (
               <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
                 <SortableContext items={statsItems.map(g => g.id)} strategy={rectSortingStrategy}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pr-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pr-2">
                   {statsItems.map((group, groupIdx) => (
                     <SortableStatGroup 
                       key={group.id} 
@@ -1531,7 +1531,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                   ))}
                   
                   {/* Hidden items block */}
-                  <div className="bg-red-950/20 border border-red-900/50 rounded-2xl p-4 space-y-4 md:col-span-2">
+                  <div className="bg-red-950/20 border border-red-900/50 rounded-2xl p-4 space-y-4 col-span-full">
                     <h3 className="text-red-400 font-bold text-sm">Скрытые атрибуты</h3>
                     <div className="grid grid-cols-2 gap-2">
                       {statsItems.flatMap(g => g.items).filter(i => i.isHidden).map(item => (
