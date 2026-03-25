@@ -865,8 +865,7 @@ export default function App() {
                               <h3 className="font-semibold text-zinc-100">{group.title}</h3>
                             </div>
                             <div className="p-2 flex-1">
-                              <table className="w-full text-sm">
-                                <tbody>
+                              <div className="w-full text-sm flex flex-col">
                                   {visibleItems.map((item, idx) => {
                                     const val = evaluateFormula(item.formula, profileData.stats);
                                     if (val === null && item.format !== 'auto') return null;
@@ -909,24 +908,23 @@ export default function App() {
                                     }
 
                                     return (
-                                      <tr 
+                                      <div 
                                         key={item.id} 
                                         className={cn(
-                                          "transition-colors hover:bg-zinc-800/30",
+                                          "flex justify-between items-center py-3 px-4 transition-colors hover:bg-zinc-800/30",
                                           idx !== visibleItems.length - 1 && "border-b border-zinc-800/30"
                                         )}
                                       >
-                                        <td className="py-3 px-4 text-zinc-400">
+                                        <div className="text-zinc-400 truncate pr-4">
                                           {item.title}
-                                        </td>
-                                        <td className="py-3 px-4 text-right font-medium text-zinc-200">
+                                        </div>
+                                        <div className="text-right font-medium text-zinc-200 shrink-0">
                                           {displayVal}
-                                        </td>
-                                      </tr>
+                                        </div>
+                                      </div>
                                     );
                                   })}
-                                </tbody>
-                              </table>
+                              </div>
                             </div>
                           </motion.div>
                         );
@@ -988,9 +986,9 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
         />
       </div>
       <div className="p-2 flex-1">
-        <table className="w-full text-sm">
+        <div className="w-full text-sm">
           <SortableContext items={group.items.map((i: any) => i.id)} strategy={verticalListSortingStrategy}>
-            <tbody className="flex flex-col w-full">
+            <div className="flex flex-col w-full">
               {group.items.map((item: any) => {
                 const originalIndex = statsItems[groupIdx].items.findIndex((i: any) => i.id === item.id);
                 return (
@@ -1008,9 +1006,9 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
                   />
                 );
               })}
-            </tbody>
+            </div>
           </SortableContext>
-        </table>
+        </div>
         <button
           onClick={() => addStatItem(groupIdx)}
           className="mt-2 w-full py-2 bg-zinc-800/30 hover:bg-zinc-800/50 text-zinc-400 hover:text-white rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1 border border-dashed border-zinc-700/50"
@@ -1033,7 +1031,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
   const formulaRef = React.useRef<any>(null);
 
   return (
-    <tr 
+    <div 
       ref={setNodeRef} 
       style={style} 
       className={cn(
@@ -1041,8 +1039,8 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
         !isLast && "border-b border-zinc-800/30"
       )}
     >
-      <td className="py-2 px-4 w-full flex items-center gap-2">
-        <div {...attributes} {...listeners} className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity shrink-0">
+      <div className="py-2 px-4 w-full flex items-center justify-between gap-2">
+        <div {...attributes} {...listeners} className="absolute left-1 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity shrink-0 bg-zinc-900/80 p-1 rounded backdrop-blur-sm z-10">
           <GripVertical className="w-4 h-4" />
         </div>
         <input
@@ -1050,7 +1048,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           value={item.title}
           onChange={(e) => updateStatItem(groupIdx, itemIdx, 'title', e.target.value)}
           placeholder="Название"
-          className="bg-transparent border-none outline-none text-zinc-400 focus:text-zinc-200 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 min-w-0 flex-1"
+          className="bg-transparent border-none outline-none text-zinc-400 focus:text-zinc-200 focus:ring-1 focus:ring-emerald-500/50 rounded px-1 min-w-0 flex-1 truncate"
         />
         <FormulaInput
           ref={formulaRef}
@@ -1060,22 +1058,24 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           placeholder="Формула"
           className="bg-transparent border-none outline-none text-zinc-200 font-mono focus:ring-1 focus:ring-emerald-500/50 rounded px-1 text-right min-w-0 flex-1 overflow-x-auto whitespace-nowrap custom-scrollbar"
         />
-        <select
-          value={item.format || 'auto'}
-          onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
-          className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-zinc-400 focus:ring-1 focus:ring-emerald-500 outline-none w-20 shrink-0"
-        >
-          <option value="auto">Авто</option>
-          <option value="number">Число</option>
-          <option value="ratio">Дробь</option>
-          <option value="percent">Процент</option>
-          <option value="duration">Время</option>
-        </select>
-        <button onClick={(e) => { e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity p-1 text-zinc-500 hover:text-red-400 shrink-0">
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </td>
-    </tr>
+        <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-1 bg-zinc-900/90 p-1 rounded-lg backdrop-blur-sm border border-zinc-800 z-10">
+          <select
+            value={item.format || 'auto'}
+            onChange={(e) => updateStatItem(groupIdx, itemIdx, 'format', e.target.value)}
+            className="bg-transparent border-none text-xs text-zinc-400 focus:ring-1 focus:ring-emerald-500 outline-none w-20 shrink-0"
+          >
+            <option value="auto" className="bg-zinc-900">Авто</option>
+            <option value="number" className="bg-zinc-900">Число</option>
+            <option value="ratio" className="bg-zinc-900">Дробь</option>
+            <option value="percent" className="bg-zinc-900">Процент</option>
+            <option value="duration" className="bg-zinc-900">Время</option>
+          </select>
+          <button onClick={(e) => { e.preventDefault(); removeStatItem(groupIdx, itemIdx); }} className="p-1 text-zinc-500 hover:text-red-400 shrink-0">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
