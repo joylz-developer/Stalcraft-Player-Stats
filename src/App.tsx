@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Component, ErrorInfo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, User, Shield, Crosshair, Activity, AlertCircle, MapPin, Loader2, 
@@ -1187,13 +1188,32 @@ function EditAttributeModal({
   const [editedItem, setEditedItem] = useState(item);
   const formulaRef = React.useRef<any>(null);
 
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
   const handleInsert = (attr: string) => {
     formulaRef.current?.insertAttribute(attr);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 w-full max-w-5xl flex flex-col lg:flex-row gap-6 max-h-[90vh]">
+  const modalContent = (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
+        onClick={onClose}
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 w-full max-w-5xl flex flex-col lg:flex-row gap-6 max-h-[90vh] relative z-10 shadow-2xl"
+      >
         
         {/* Left side: Edit Form */}
         <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
@@ -1320,9 +1340,11 @@ function EditAttributeModal({
             focusedInput={{ insert: handleInsert }}
           />
         </div>
-      </div>
+      </motion.div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
 
 function AttributeSidebar({ 
@@ -1710,15 +1732,6 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                         Добавить показатель
                       </button>
                     )}
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={isEditMode} 
-                        onChange={(e) => setIsEditMode(e.target.value === 'on' ? !isEditMode : e.target.checked)} 
-                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-950"
-                      />
-                      <span className="text-sm text-zinc-300">Режим редактирования структуры</span>
-                    </label>
                   </div>
                   <button
                     onClick={() => onSave(items, statsItems)}
@@ -1777,15 +1790,6 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                         Добавить блок
                       </button>
                     )}
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={isEditMode} 
-                        onChange={(e) => setIsEditMode(e.target.value === 'on' ? !isEditMode : e.target.checked)} 
-                        className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-950"
-                      />
-                      <span className="text-sm text-zinc-300">Режим редактирования структуры</span>
-                    </label>
                   </div>
                   <button
                     onClick={() => onSave(items, statsItems)}
@@ -1862,31 +1866,51 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
         </div>
       )}
 
-      {editingItem && (
-        <EditAttributeModal
-          item={editingItem}
-          onSave={(updatedItem: any) => {
-            // Update the item in statsItems or items
-            if (activeTab === 'stats') {
-              setStatsItems(statsItems.map(group => ({
-                ...group,
-                items: group.items.map(i => i.id === updatedItem.id ? updatedItem : i)
-              })));
-            } else {
-              setItems(items.map(i => i.id === updatedItem.id ? updatedItem : i));
-            }
-            setEditingItem(null);
-          }}
-          onClose={() => setEditingItem(null)}
-          previewLoading={previewLoading}
-          previewNickname={previewNickname}
-          setPreviewNickname={setPreviewNickname}
-          previewRegion={previewRegion}
-          setPreviewRegion={setPreviewRegion}
-          attributeSearch={attributeSearch}
-          setAttributeSearch={setAttributeSearch}
-          previewData={previewData}
-        />
+      <AnimatePresence>
+        {editingItem && (
+          <EditAttributeModal
+            item={editingItem.item}
+            onSave={(updatedItem: any) => {
+              // Update the item in statsItems or items
+              if (activeTab === 'stats') {
+                setStatsItems(statsItems.map(group => ({
+                  ...group,
+                  items: group.items.map(i => i.id === updatedItem.id ? updatedItem : i)
+                })));
+              } else {
+                setItems(items.map(i => i.id === updatedItem.id ? updatedItem : i));
+              }
+              setEditingItem(null);
+            }}
+            onClose={() => setEditingItem(null)}
+            previewLoading={previewLoading}
+            previewNickname={previewNickname}
+            setPreviewNickname={setPreviewNickname}
+            previewRegion={previewRegion}
+            setPreviewRegion={setPreviewRegion}
+            attributeSearch={attributeSearch}
+            setAttributeSearch={setAttributeSearch}
+            previewData={previewData}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Floating Edit Mode Button */}
+      {(activeTab === 'highlights' || activeTab === 'stats') && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40">
+          <button
+            onClick={() => setIsEditMode(!isEditMode)}
+            className={cn(
+              "px-6 py-3 rounded-full font-medium shadow-2xl transition-all flex items-center gap-2 border",
+              isEditMode 
+                ? "bg-emerald-600 text-white border-emerald-500 shadow-emerald-900/50" 
+                : "bg-zinc-900/90 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-200 backdrop-blur-md"
+            )}
+          >
+            {isEditMode ? <Save className="w-5 h-5" /> : <Settings className="w-5 h-5" />}
+            {isEditMode ? "Выйти из редактирования" : "Режим редактирования"}
+          </button>
+        </div>
       )}
     </motion.div>
     </>
