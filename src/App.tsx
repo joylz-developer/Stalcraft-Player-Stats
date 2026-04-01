@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, User, Shield, Crosshair, Activity, AlertCircle, MapPin, Loader2, 
   Target, Skull, Coins, Map, Swords, Home, Trophy, Percent, Clock, Calendar,
-  Settings, LogOut, Plus, Trash2, Save, ChevronUp, ChevronDown, GripVertical
+  Settings, LogOut, Plus, Trash2, Save, ChevronUp, ChevronDown, GripVertical, X
 } from 'lucide-react';
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, rectSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -1043,9 +1043,13 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
     <div 
       ref={setNodeRef} 
       style={style} 
-      onDoubleClick={() => onEditItem(item, groupIdx, itemIdx)}
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        window.getSelection()?.removeAllRanges();
+        onEditItem(item, groupIdx, itemIdx);
+      }}
       className={cn(
-        "group/item transition-colors hover:bg-zinc-800/30 relative flex w-full items-center cursor-pointer",
+        "group/item transition-colors hover:bg-zinc-800/30 relative flex w-full items-center cursor-pointer select-none",
         !isLast && "border-b border-zinc-800/30"
       )}
     >
@@ -1085,8 +1089,12 @@ function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedIn
     <div 
       ref={setNodeRef} 
       style={style} 
-      onDoubleClick={() => onEditItem(item, null, idx)}
-      className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center cursor-pointer hover:border-zinc-700 transition-colors relative group/hl"
+      onDoubleClick={(e) => {
+        e.preventDefault();
+        window.getSelection()?.removeAllRanges();
+        onEditItem(item, null, idx);
+      }}
+      className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center cursor-pointer hover:border-zinc-700 transition-colors relative group/hl select-none"
     >
       {isEditMode && (
         <div {...attributes} {...listeners} className="absolute left-2 opacity-0 group-hover/hl:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity bg-zinc-900/80 p-1 rounded backdrop-blur-sm z-10">
@@ -1199,6 +1207,28 @@ function EditAttributeModal({
     formulaRef.current?.insertAttribute(attr);
   };
 
+  const previewValue = evaluateFormula(editedItem.formula, previewData?.stats || []);
+  let formattedPreview = String(previewValue);
+  if (editedItem.format === 'percent') formattedPreview = previewValue.toFixed(1) + '%';
+  if (editedItem.format === 'ratio') formattedPreview = previewValue.toFixed(2);
+  if (editedItem.format === 'number') formattedPreview = previewValue.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+  if (editedItem.format === 'duration') {
+    const hours = Math.floor(previewValue / (1000 * 60 * 60));
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    formattedPreview = `${days} д. ${remHours} ч.`;
+  }
+  if (editedItem.format === 'duration_hours') {
+    const hours = Math.floor(previewValue / (1000 * 60 * 60));
+    formattedPreview = `${hours} ч.`;
+  }
+  if (editedItem.format === 'date') {
+    formattedPreview = new Date(previewValue).toLocaleDateString('ru-RU');
+  }
+  if (editedItem.format === 'distance') {
+    formattedPreview = (previewValue / 100000).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' км';
+  }
+
   const modalContent = (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div 
@@ -1214,6 +1244,12 @@ function EditAttributeModal({
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 w-full max-w-5xl flex flex-col lg:flex-row gap-6 max-h-[90vh] relative z-10 shadow-2xl"
       >
+        <button 
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-full transition-colors z-20"
+        >
+          <X className="w-5 h-5" />
+        </button>
         
         {/* Left side: Edit Form */}
         <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
@@ -1245,9 +1281,15 @@ function EditAttributeModal({
                   className="text-white font-mono text-sm outline-none"
                 />
               </div>
-              <p className="text-xs text-zinc-500 mt-2">
-                Используйте подсказки справа для вставки атрибутов. Вы можете использовать математические операторы (+, -, *, /).
-              </p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xs text-zinc-500">
+                  Используйте подсказки справа для вставки атрибутов.
+                </p>
+                <div className="flex items-center gap-2 bg-zinc-900/80 px-3 py-1.5 rounded-lg border border-zinc-800">
+                  <span className="text-xs text-zinc-500">Результат:</span>
+                  <span className="text-sm font-mono font-bold text-emerald-400">{formattedPreview}</span>
+                </div>
+              </div>
             </div>
 
             <div>
