@@ -132,6 +132,7 @@ interface HighlightConfig {
   formula: string;
   color: string;
   format: 'number' | 'percent' | 'ratio' | 'duration' | 'duration_hours';
+  roundToK?: boolean;
 }
 
 export interface StatItemConfig {
@@ -140,6 +141,7 @@ export interface StatItemConfig {
   formula: string;
   format: 'auto' | 'number' | 'percent' | 'ratio' | 'duration' | 'duration_hours' | 'date' | 'distance';
   isHidden: boolean;
+  roundToK?: boolean;
 }
 
 export interface StatGroupConfig {
@@ -267,7 +269,7 @@ export const DEFAULT_STATS_CONFIG: StatGroupConfig[] = [
   { id: 'g_10', title: 'Перемещение', icon: 'MapPin', items: ['dis-on-foo', 'dis-sne', 'dis-cra', 'dis-air'].map(k => ({ id: k, title: STAT_NAMES[k] || k, formula: `{${k}}`, format: 'auto', isHidden: false })) }
 ];
 
-const formatStatValue = (id: string, type: string, value: any) => {
+const formatStatValue = (id: string, type: string, value: any, roundToK: boolean = true) => {
   if (type === 'DURATION') {
     const hours = Math.floor(value / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
@@ -281,10 +283,18 @@ const formatStatValue = (id: string, type: string, value: any) => {
     if (id.startsWith('dis-') || id.startsWith('tpacks-distance')) {
       return (value / 100000).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' км';
     }
-    return Number(value).toLocaleString('ru-RU', { maximumFractionDigits: 0 });
+    const numVal = Number(value);
+    if (roundToK && Math.abs(numVal) >= 1000) {
+      return (numVal / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + 'к';
+    }
+    return numVal.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
   }
   if (type === 'INTEGER') {
-    return Number(value).toLocaleString('ru-RU');
+    const numVal = Number(value);
+    if (roundToK && Math.abs(numVal) >= 1000) {
+      return (numVal / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + 'к';
+    }
+    return numVal.toLocaleString('ru-RU');
   }
   return String(value);
 };
@@ -310,7 +320,7 @@ export const DEFAULT_UI_CONFIG = {
   ]
 };
 
-export const formatCustomValue = (val: number | null, formatId: string, formats: any[]) => {
+export const formatCustomValue = (val: number | null, formatId: string, formats: any[], roundToK: boolean = true) => {
   if (val === null || val === undefined || isNaN(val)) return '—';
   const format = formats.find((f: any) => f.id === formatId);
   if (!format) return String(val);
@@ -328,32 +338,18 @@ export const formatCustomValue = (val: number | null, formatId: string, formats:
   } else {
     // Legacy fallback
     const multiplier = format.multiplier !== undefined ? format.multiplier : 1;
-    const adjustedVal = val * multiplier;
+    resultVal = val * multiplier;
+  }
 
-    if (format.special === 'duration') {
-      const hours = Math.floor(adjustedVal / (1000 * 60 * 60));
-      const days = Math.floor(hours / 24);
-      const remHours = hours % 24;
-      return `${days} д. ${remHours} ч.`;
-    }
-    if (format.special === 'duration_hours') {
-      const hours = Math.floor(adjustedVal / (1000 * 60 * 60));
-      return `${hours} ч.`;
-    }
-    if (format.special === 'date') {
-      return new Date(adjustedVal).toLocaleDateString('ru-RU');
-    }
-    if (format.special === 'distance') {
-      return (adjustedVal / 100000).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 1 }) + (format.suffix ? ' ' + format.suffix : ' км');
-    }
-
-    if (format.id === 'ratio') {
-      resultVal = adjustedVal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } else if (format.id === 'percent') {
-      resultVal = adjustedVal.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
-    } else {
-      resultVal = adjustedVal.toLocaleString('ru-RU', { minimumFractionDigits: format.decimals || 0, maximumFractionDigits: format.decimals || 0 });
-    }
+  // Логика округления до тысяч (к)
+  let isKRounded = false;
+  const forbiddenFormats = ['ratio', 'percent', 'date', 'distance', 'duration', 'duration_hours'];
+  
+  if (roundToK && typeof resultVal === 'number' && Math.abs(resultVal) >= 1000 && 
+      !forbiddenFormats.includes(format.id) && 
+      !forbiddenFormats.includes(format.special || '')) {
+      resultVal = resultVal / 1000;
+      isKRounded = true;
   }
 
   let finalStr = '';
@@ -364,9 +360,13 @@ export const formatCustomValue = (val: number | null, formatId: string, formats:
       finalStr = resultVal.toLocaleDateString('ru-RU');
     }
   } else if (typeof resultVal === 'number') {
-    const parts = resultVal.toString().split('.');
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-    finalStr = parts.join(',');
+    if (isKRounded) {
+      finalStr = resultVal.toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+    } else {
+      const parts = resultVal.toString().split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+      finalStr = parts.join(',');
+    }
   } else if (typeof resultVal === 'string' && /^-?\d+(\.\d+)?$/.test(resultVal)) {
     const parts = resultVal.split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
@@ -375,7 +375,7 @@ export const formatCustomValue = (val: number | null, formatId: string, formats:
     finalStr = String(resultVal);
   }
 
-  return `${finalStr}${format.suffix ? ' ' + format.suffix : ''}`;
+  return `${finalStr}${isKRounded ? 'к' : ''}${format.suffix ? ' ' + format.suffix : ''}`;
 };
 
 const evaluateFormula = (formula: string, stats: StatItem[]) => {
@@ -973,12 +973,12 @@ export default function App() {
                             </span>
                           )}
                         </div>
-
                         {/* Dynamic Highlights Grid */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                           {highlightsConfig.map((config, idx) => {
                             const val = evaluateFormula(config.formula, profileData.stats);
-                            const displayVal = formatCustomValue(val, config.format, uiConfig.formats);
+                            // Добавили передачу параметра config.roundToK !== false
+                            const displayVal = formatCustomValue(val, config.format, uiConfig.formats, config.roundToK !== false);
                             const colorObj = uiConfig.colors.find((c: any) => c.id === config.color);
                             const hexColor = colorObj ? colorObj.hex : undefined;
                             const legacyColorClass = !colorObj ? config.color : undefined;
@@ -1030,15 +1030,18 @@ export default function App() {
                                         const statId = match[1];
                                         const stat = profileData.stats.find(s => s.id === statId);
                                         if (stat) {
-                                          displayVal = formatStatValue(stat.id, stat.type, stat.value);
+                                          // Добавили item.roundToK !== false
+                                          displayVal = formatStatValue(stat.id, stat.type, stat.value, item.roundToK !== false);
                                         } else {
                                           return null;
                                         }
                                       } else {
-                                        displayVal = formatCustomValue(val, 'number', uiConfig.formats);
+                                        // Добавили item.roundToK !== false
+                                        displayVal = formatCustomValue(val, 'number', uiConfig.formats, item.roundToK !== false);
                                       }
                                     } else if (val !== null) {
-                                      displayVal = formatCustomValue(val, item.format, uiConfig.formats);
+                                      // Добавили item.roundToK !== false
+                                      displayVal = formatCustomValue(val, item.format, uiConfig.formats, item.roundToK !== false);
                                     }
 
                                     return (
@@ -1181,15 +1184,19 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
       if (match && previewData?.stats) {
         const stat = previewData.stats.find((s: any) => s.id === match[1]);
         if (stat) {
-          displayVal = formatStatValue(stat.id, stat.type, stat.value);
+          // Добавили item.roundToK !== false
+          displayVal = formatStatValue(stat.id, stat.type, stat.value, item.roundToK !== false);
         } else {
-          displayVal = formatCustomValue(previewValue, 'number', uiConfig.formats);
+          // Добавили item.roundToK !== false
+          displayVal = formatCustomValue(previewValue, 'number', uiConfig.formats, item.roundToK !== false);
         }
       } else {
-        displayVal = formatCustomValue(previewValue, 'number', uiConfig.formats);
+        // Добавили item.roundToK !== false
+        displayVal = formatCustomValue(previewValue, 'number', uiConfig.formats, item.roundToK !== false);
       }
   } else {
-      displayVal = formatCustomValue(previewValue, item.format, uiConfig.formats);
+      // Добавили item.roundToK !== false
+      displayVal = formatCustomValue(previewValue, item.format, uiConfig.formats, item.roundToK !== false);
   }
 
   return (
@@ -1239,7 +1246,8 @@ function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedIn
   };
 
   const previewValue = evaluateFormula(item.formula, previewData?.stats || []);
-  const displayVal = formatCustomValue(previewValue, item.format, uiConfig.formats);
+  // Добавили item.roundToK !== false
+  const displayVal = formatCustomValue(previewValue, item.format, uiConfig.formats, item.roundToK !== false);
   const colorObj = uiConfig.colors.find((c: any) => c.id === item.color);
   const hexColor = colorObj ? colorObj.hex : undefined;
   const legacyBgClass = !colorObj && item.color ? item.color.replace('text-', 'bg-') : 'bg-white';
@@ -1391,15 +1399,15 @@ function EditAttributeModal({
     if (match && previewData?.stats) {
       const stat = previewData.stats.find((s: any) => s.id === match[1]);
       if (stat) {
-        formattedPreview = formatStatValue(stat.id, stat.type, stat.value);
+        formattedPreview = formatStatValue(stat.id, stat.type, stat.value, editedItem.roundToK !== false);
       } else {
-        formattedPreview = formatCustomValue(previewValue, 'number', uiConfig.formats);
+        formattedPreview = formatCustomValue(previewValue, 'number', uiConfig.formats, editedItem.roundToK !== false);
       }
     } else {
-      formattedPreview = formatCustomValue(previewValue, 'number', uiConfig.formats);
+      formattedPreview = formatCustomValue(previewValue, 'number', uiConfig.formats, editedItem.roundToK !== false);
     }
   } else {
-    formattedPreview = formatCustomValue(previewValue, editedItem.format, uiConfig.formats);
+    formattedPreview = formatCustomValue(previewValue, editedItem.format, uiConfig.formats, editedItem.roundToK !== false);
   }
 
   const modalContent = (
@@ -1507,6 +1515,27 @@ function EditAttributeModal({
                 </div>
               </div>
             )}
+
+            {/* ПЕРЕКЛЮЧАТЕЛЬ ОКРУГЛЕНИЯ */}
+            <div 
+              onClick={() => setEditedItem({ ...editedItem, roundToK: editedItem.roundToK === false ? true : false })}
+              className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg cursor-pointer hover:bg-zinc-800/80 transition-colors mt-2 select-none"
+            >
+              <div>
+                <div className="text-sm font-medium text-zinc-200">Округлять до тысяч (к)</div>
+                <div className="text-xs text-zinc-500 mt-0.5">Сокращает большие числа: 15 500 → 15.5к</div>
+              </div>
+              <div className={cn(
+                "w-11 h-6 rounded-full transition-colors relative shrink-0",
+                editedItem.roundToK !== false ? "bg-emerald-500" : "bg-zinc-700"
+              )}>
+                <div className={cn(
+                  "absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform shadow-sm",
+                  editedItem.roundToK !== false ? "translate-x-5" : "translate-x-0"
+                )} />
+              </div>
+            </div>
+
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-zinc-800">
