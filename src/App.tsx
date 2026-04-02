@@ -260,6 +260,53 @@ const formatStatValue = (id: string, type: string, value: any) => {
   return String(value);
 };
 
+export const DEFAULT_UI_CONFIG = {
+  formats: [
+    { id: 'auto', label: 'Автоматически', suffix: '', decimals: 0 },
+    { id: 'number', label: 'Число', suffix: '', decimals: 0 },
+    { id: 'ratio', label: 'Дробь (2 знака)', suffix: '', decimals: 2 },
+    { id: 'percent', label: 'Процент', suffix: '%', decimals: 1 },
+    { id: 'duration', label: 'Время (Дни и часы)', suffix: '', decimals: 0, special: 'duration' },
+    { id: 'duration_hours', label: 'Время (Только часы)', suffix: ' ч.', decimals: 0, special: 'duration_hours' },
+    { id: 'date', label: 'Дата', suffix: '', decimals: 0, special: 'date' },
+    { id: 'distance', label: 'Дистанция (км)', suffix: ' км', decimals: 1, special: 'distance' }
+  ],
+  colors: [
+    { id: 'text-white', label: 'Белый', colorClass: 'text-white', bgClass: 'bg-white' },
+    { id: 'text-emerald-400', label: 'Изумрудный', colorClass: 'text-emerald-400', bgClass: 'bg-emerald-400' },
+    { id: 'text-blue-400', label: 'Синий', colorClass: 'text-blue-400', bgClass: 'bg-blue-400' },
+    { id: 'text-amber-400', label: 'Желтый', colorClass: 'text-amber-400', bgClass: 'bg-amber-400' },
+    { id: 'text-red-400', label: 'Красный', colorClass: 'text-red-400', bgClass: 'bg-red-400' },
+    { id: 'text-purple-400', label: 'Фиолетовый', colorClass: 'text-purple-400', bgClass: 'bg-purple-400' }
+  ]
+};
+
+export const formatCustomValue = (val: number | null, formatId: string, formats: any[]) => {
+  if (val === null || val === undefined || isNaN(val)) return '—';
+  const format = formats.find((f: any) => f.id === formatId);
+  if (!format) return String(val);
+
+  if (format.special === 'duration') {
+    const hours = Math.floor(val / (1000 * 60 * 60));
+    const days = Math.floor(hours / 24);
+    const remHours = hours % 24;
+    return `${days} д. ${remHours} ч.`;
+  }
+  if (format.special === 'duration_hours') {
+    const hours = Math.floor(val / (1000 * 60 * 60));
+    return `${hours} ч.`;
+  }
+  if (format.special === 'date') {
+    return new Date(val).toLocaleDateString('ru-RU');
+  }
+  if (format.special === 'distance') {
+    return (val / 100000).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 1 }) + (format.suffix || ' км');
+  }
+
+  let numStr = Number(val).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 0 });
+  return `${numStr}${format.suffix ? ' ' + format.suffix : ''}`;
+};
+
 const evaluateFormula = (formula: string, stats: StatItem[]) => {
   let parsedFormula = formula;
   const matches = formula.match(/\{([^}]+)\}/g);
@@ -396,6 +443,7 @@ export default function App() {
   const [user, setUser] = useState<UserData | null>(null);
   const [highlightsConfig, setHighlightsConfig] = useState<HighlightConfig[]>([]);
   const [statsConfig, setStatsConfig] = useState<StatGroupConfig[]>([]);
+  const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG);
   const [showAdmin, setShowAdmin] = useState(false);
   const [myCharacters, setMyCharacters] = useState<any[]>([]);
   const popupRef = React.useRef<Window | null>(null);
@@ -404,6 +452,7 @@ export default function App() {
     fetchUser();
     fetchHighlights();
     fetchStatsConfig();
+    fetchUiConfig();
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
@@ -481,6 +530,17 @@ export default function App() {
     } catch (e) {
       console.error('Failed to fetch stats config');
       setStatsConfig(DEFAULT_STATS_CONFIG);
+    }
+  };
+
+  const fetchUiConfig = async () => {
+    try {
+      const res = await axios.get('/api/settings/ui_config');
+      if (res.data) {
+        setUiConfig(res.data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch UI config');
     }
   };
 
@@ -681,13 +741,16 @@ export default function App() {
               <AdminPanel 
                 config={highlightsConfig} 
                 statsConfig={statsConfig}
+                uiConfig={uiConfig}
                 myCharacters={myCharacters}
-                onSave={async (newConfig, newStatsConfig) => {
+                onSave={async (newConfig, newStatsConfig, newUiConfig) => {
                   try {
                     await axios.post('/api/admin/highlights', newConfig);
                     await axios.post('/api/admin/settings/stats_config', newStatsConfig);
+                    await axios.post('/api/admin/settings/ui_config', newUiConfig);
                     setHighlightsConfig(newConfig);
                     setStatsConfig(newStatsConfig);
+                    setUiConfig(newUiConfig);
                     setShowAdmin(false);
                   } catch (e) {
                     alert('Ошибка сохранения');
@@ -817,25 +880,14 @@ export default function App() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                           {highlightsConfig.map((config, idx) => {
                             const val = evaluateFormula(config.formula, profileData.stats);
-                            let displayVal = String(val);
-                            if (config.format === 'percent') displayVal = val.toFixed(1) + '%';
-                            if (config.format === 'ratio') displayVal = val.toFixed(2);
-                            if (config.format === 'number') displayVal = val.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-                            if (config.format === 'duration') {
-                              const hours = Math.floor(val / (1000 * 60 * 60));
-                              const days = Math.floor(hours / 24);
-                              const remHours = hours % 24;
-                              displayVal = `${days} д. ${remHours} ч.`;
-                            }
-                            if (config.format === 'duration_hours') {
-                              const hours = Math.floor(val / (1000 * 60 * 60));
-                              displayVal = `${hours} ч.`;
-                            }
+                            const displayVal = formatCustomValue(val, config.format, uiConfig.formats);
+                            const colorObj = uiConfig.colors.find(c => c.id === config.color);
+                            const colorClass = colorObj ? colorObj.colorClass : config.color;
 
                             return (
                               <div key={idx} className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-4 text-center">
                                 <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">{config.title}</div>
-                                <div className={cn("text-2xl font-bold", config.color)}>{displayVal}</div>
+                                <div className={cn("text-2xl font-bold", colorClass)}>{displayVal}</div>
                               </div>
                             );
                           })}
@@ -884,28 +936,10 @@ export default function App() {
                                           return null;
                                         }
                                       } else {
-                                        displayVal = Number(val).toLocaleString('ru-RU', { maximumFractionDigits: 2 });
+                                        displayVal = formatCustomValue(val, 'number', uiConfig.formats);
                                       }
                                     } else if (val !== null) {
-                                      if (item.format === 'percent') displayVal = val.toFixed(1) + '%';
-                                      if (item.format === 'ratio') displayVal = val.toFixed(2);
-                                      if (item.format === 'number') displayVal = val.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-                                      if (item.format === 'duration') {
-                                        const hours = Math.floor(val / (1000 * 60 * 60));
-                                        const days = Math.floor(hours / 24);
-                                        const remHours = hours % 24;
-                                        displayVal = `${days} д. ${remHours} ч.`;
-                                      }
-                                      if (item.format === 'duration_hours') {
-                                        const hours = Math.floor(val / (1000 * 60 * 60));
-                                        displayVal = `${hours} ч.`;
-                                      }
-                                      if (item.format === 'date') {
-                                        displayVal = new Date(val).toLocaleDateString('ru-RU');
-                                      }
-                                      if (item.format === 'distance') {
-                                        displayVal = (val / 100000).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' км';
-                                      }
+                                      displayVal = formatCustomValue(val, item.format, uiConfig.formats);
                                     }
 
                                     return (
@@ -1031,13 +1065,31 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
   );
 }
 
-function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput, isLast, isEditMode, onEditItem }: any) {
+function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput, isLast, isEditMode, onEditItem, previewData, uiConfig }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
     transition,
     ...(isDragging ? { position: 'relative' as const, zIndex: 50, opacity: 0.5 } : {})
   };
+
+  const previewValue = evaluateFormula(item.formula, previewData?.stats || []);
+  let displayVal = '—';
+  if (item.format === 'auto') {
+      const match = item.formula.match(/^\{([^}]+)\}$/);
+      if (match && previewData?.stats) {
+        const stat = previewData.stats.find((s: any) => s.id === match[1]);
+        if (stat) {
+          displayVal = formatStatValue(stat.id, stat.type, stat.value);
+        } else {
+          displayVal = formatCustomValue(previewValue, 'number', uiConfig.formats);
+        }
+      } else {
+        displayVal = formatCustomValue(previewValue, 'number', uiConfig.formats);
+      }
+  } else {
+      displayVal = formatCustomValue(previewValue, item.format, uiConfig.formats);
+  }
 
   return (
     <div 
@@ -1063,7 +1115,7 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
           {item.title || 'Без названия'}
         </div>
         <div className="text-zinc-500 font-mono text-xs break-words flex-1 text-right pr-4">
-          {item.formula || 'Нет формулы'}
+          {displayVal}
         </div>
         {isEditMode && (
           <div className="absolute right-2 opacity-0 group-hover/item:opacity-100 focus-within:opacity-100 transition-opacity flex items-center gap-1 bg-zinc-900/90 p-1 rounded-lg backdrop-blur-sm border border-zinc-800 z-10">
@@ -1077,13 +1129,18 @@ function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, 
   );
 }
 
-function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput, isEditMode, onEditItem }: any) {
+function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput, isEditMode, onEditItem, previewData, uiConfig }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
     transition,
     ...(isDragging ? { position: 'relative' as const, zIndex: 50, opacity: 0.5 } : {})
   };
+
+  const previewValue = evaluateFormula(item.formula, previewData?.stats || []);
+  const displayVal = formatCustomValue(previewValue, item.format, uiConfig.formats);
+  const colorObj = uiConfig.colors.find((c: any) => c.id === item.color);
+  const bgClass = colorObj ? colorObj.bgClass : (item.color ? item.color.replace('text-', 'bg-') : 'bg-white');
 
   return (
     <div 
@@ -1104,11 +1161,11 @@ function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedIn
       
       <div className="flex-1 flex items-center justify-between w-full pl-6 pr-8">
         <div className="flex items-center gap-4">
-          <div className={cn("w-3 h-3 rounded-full", item.color ? item.color.replace('text-', 'bg-') : 'bg-white')} />
+          <div className={cn("w-3 h-3 rounded-full", bgClass)} />
           <span className="text-zinc-300 font-medium">{item.title || 'Без названия'}</span>
         </div>
-        <div className="text-zinc-500 font-mono text-xs break-words max-w-[200px]">
-          {item.formula || 'Нет формулы'}
+        <div className="text-zinc-500 font-mono text-xs break-words max-w-[200px] text-right">
+          {displayVal}
         </div>
       </div>
 
@@ -1191,7 +1248,8 @@ function EditAttributeModal({
   setPreviewRegion, 
   attributeSearch, 
   setAttributeSearch, 
-  previewData 
+  previewData,
+  uiConfig
 }: any) {
   const [editedItem, setEditedItem] = useState(item);
   const formulaRef = React.useRef<any>(null);
@@ -1208,25 +1266,21 @@ function EditAttributeModal({
   };
 
   const previewValue = evaluateFormula(editedItem.formula, previewData?.stats || []);
-  let formattedPreview = String(previewValue);
-  if (editedItem.format === 'percent') formattedPreview = previewValue.toFixed(1) + '%';
-  if (editedItem.format === 'ratio') formattedPreview = previewValue.toFixed(2);
-  if (editedItem.format === 'number') formattedPreview = previewValue.toLocaleString('ru-RU', { maximumFractionDigits: 0 });
-  if (editedItem.format === 'duration') {
-    const hours = Math.floor(previewValue / (1000 * 60 * 60));
-    const days = Math.floor(hours / 24);
-    const remHours = hours % 24;
-    formattedPreview = `${days} д. ${remHours} ч.`;
-  }
-  if (editedItem.format === 'duration_hours') {
-    const hours = Math.floor(previewValue / (1000 * 60 * 60));
-    formattedPreview = `${hours} ч.`;
-  }
-  if (editedItem.format === 'date') {
-    formattedPreview = new Date(previewValue).toLocaleDateString('ru-RU');
-  }
-  if (editedItem.format === 'distance') {
-    formattedPreview = (previewValue / 100000).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' км';
+  let formattedPreview = '—';
+  if (editedItem.format === 'auto') {
+    const match = editedItem.formula.match(/^\{([^}]+)\}$/);
+    if (match && previewData?.stats) {
+      const stat = previewData.stats.find((s: any) => s.id === match[1]);
+      if (stat) {
+        formattedPreview = formatStatValue(stat.id, stat.type, stat.value);
+      } else {
+        formattedPreview = formatCustomValue(previewValue, 'number', uiConfig.formats);
+      }
+    } else {
+      formattedPreview = formatCustomValue(previewValue, 'number', uiConfig.formats);
+    }
+  } else {
+    formattedPreview = formatCustomValue(previewValue, editedItem.format, uiConfig.formats);
   }
 
   const modalContent = (
@@ -1295,22 +1349,13 @@ function EditAttributeModal({
             <div>
               <label className="block text-sm font-medium text-zinc-300 mb-2">Формат отображения</label>
               <div className="grid grid-cols-2 gap-2">
-                {[
-                  { value: 'auto', label: 'Автоматически' },
-                  { value: 'number', label: 'Число' },
-                  { value: 'ratio', label: 'Дробь (2 знака)' },
-                  { value: 'percent', label: 'Процент' },
-                  { value: 'duration', label: 'Время (Дни и часы)' },
-                  { value: 'duration_hours', label: 'Время (Только часы)' },
-                  { value: 'date', label: 'Дата' },
-                  { value: 'distance', label: 'Дистанция (км)' }
-                ].map(opt => (
+                {uiConfig.formats.map((opt: any) => (
                   <button
-                    key={opt.value}
-                    onClick={() => setEditedItem({ ...editedItem, format: opt.value })}
+                    key={opt.id}
+                    onClick={() => setEditedItem({ ...editedItem, format: opt.id })}
                     className={cn(
                       "px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left border",
-                      editedItem.format === opt.value 
+                      editedItem.format === opt.id 
                         ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/50" 
                         : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-300"
                     )}
@@ -1325,25 +1370,18 @@ function EditAttributeModal({
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Цвет акцента</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: 'text-white', label: 'Белый', bg: 'bg-white' },
-                    { value: 'text-emerald-400', label: 'Изумрудный', bg: 'bg-emerald-400' },
-                    { value: 'text-blue-400', label: 'Синий', bg: 'bg-blue-400' },
-                    { value: 'text-amber-400', label: 'Желтый', bg: 'bg-amber-400' },
-                    { value: 'text-red-400', label: 'Красный', bg: 'bg-red-400' },
-                    { value: 'text-purple-400', label: 'Фиолетовый', bg: 'bg-purple-400' }
-                  ].map(opt => (
+                  {uiConfig.colors.map((opt: any) => (
                     <button
-                      key={opt.value}
-                      onClick={() => setEditedItem({ ...editedItem, color: opt.value })}
+                      key={opt.id}
+                      onClick={() => setEditedItem({ ...editedItem, color: opt.id })}
                       className={cn(
                         "px-3 py-2 rounded-lg text-xs font-medium transition-colors flex items-center gap-2 border",
-                        editedItem.color === opt.value 
+                        editedItem.color === opt.id 
                           ? "bg-zinc-800 text-white border-zinc-600" 
                           : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-300"
                       )}
                     >
-                      <div className={cn("w-2 h-2 rounded-full", opt.bg)} />
+                      <div className={cn("w-2 h-2 rounded-full", opt.bgClass)} />
                       {opt.label}
                     </button>
                   ))}
@@ -1484,10 +1522,11 @@ function AttributeSidebar({
   );
 }
 
-function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { config: HighlightConfig[], statsConfig: StatGroupConfig[], myCharacters: any[], onSave: (c: HighlightConfig[], s: StatGroupConfig[]) => void, onClose: () => void }) {
-  const [activeTab, setActiveTab] = useState<'highlights' | 'stats' | 'users'>('highlights');
+function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClose }: { config: HighlightConfig[], statsConfig: StatGroupConfig[], uiConfig: any, myCharacters: any[], onSave: (c: HighlightConfig[], s: StatGroupConfig[], u: any) => void, onClose: () => void }) {
+  const [activeTab, setActiveTab] = useState<'highlights' | 'stats' | 'users' | 'ui_settings'>('highlights');
   const [items, setItems] = useState<HighlightConfig[]>(config.map((c, i) => ({ ...c, id: c.id || `h_${Date.now()}_${i}` })));
   const [statsItems, setStatsItems] = useState<StatGroupConfig[]>(statsConfig);
+  const [localUiConfig, setLocalUiConfig] = useState(uiConfig);
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [focusedInput, setFocusedInput] = useState<{ type: 'highlight' | 'stat', groupIndex?: number, itemIndex: number, ref?: HTMLInputElement | null, insert?: (attr: string) => void } | null>(null);
@@ -1740,6 +1779,15 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
         >
           Пользователи
         </button>
+        <button
+          onClick={() => setActiveTab('ui_settings')}
+          className={cn(
+            "px-4 py-2 rounded-lg text-sm font-medium transition-colors",
+            activeTab === 'ui_settings' ? "bg-emerald-500/10 text-emerald-400" : "text-zinc-400 hover:text-zinc-200"
+          )}
+        >
+          Настройки UI
+        </button>
       </div>
 
       {(activeTab === 'highlights' || activeTab === 'stats') && (
@@ -1776,7 +1824,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                     )}
                   </div>
                   <button
-                    onClick={() => onSave(items, statsItems)}
+                    onClick={() => onSave(items, statsItems, localUiConfig)}
                     className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
                   >
                     <Save className="w-4 h-4" />
@@ -1834,7 +1882,7 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
                     )}
                   </div>
                   <button
-                    onClick={() => onSave(items, statsItems)}
+                    onClick={() => onSave(items, statsItems, localUiConfig)}
                     className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
                   >
                     <Save className="w-4 h-4" />
@@ -1908,10 +1956,101 @@ function AdminPanel({ config, statsConfig, myCharacters, onSave, onClose }: { co
         </div>
       )}
 
+      {activeTab === 'ui_settings' && (
+        <div className="space-y-8">
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4">Форматы отображения</h3>
+            <div className="space-y-2">
+              {localUiConfig.formats.map((fmt: any, idx: number) => (
+                <div key={idx} className="flex gap-2 items-center bg-zinc-900 p-2 rounded-lg">
+                  <input value={fmt.id} readOnly className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-zinc-500 w-32 cursor-not-allowed" title="ID формата (нельзя изменить)" />
+                  <input value={fmt.label} onChange={e => {
+                    const newFormats = [...localUiConfig.formats];
+                    newFormats[idx].label = e.target.value;
+                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="Название" />
+                  <input value={fmt.suffix || ''} onChange={e => {
+                    const newFormats = [...localUiConfig.formats];
+                    newFormats[idx].suffix = e.target.value;
+                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-24" placeholder="Суффикс (напр. %)" />
+                  <input type="number" value={fmt.decimals || 0} onChange={e => {
+                    const newFormats = [...localUiConfig.formats];
+                    newFormats[idx].decimals = parseInt(e.target.value) || 0;
+                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-20" placeholder="Дроби" />
+                  <button onClick={() => {
+                    if (fmt.id === 'auto') return alert('Нельзя удалить автоматический формат');
+                    const newFormats = localUiConfig.formats.filter((_: any, i: number) => i !== idx);
+                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                  }} className="p-2 text-red-400 hover:bg-red-400/10 rounded"><Trash2 className="w-4 h-4"/></button>
+                </div>
+              ))}
+              <button onClick={() => {
+                const newId = 'custom_' + Date.now();
+                setLocalUiConfig({
+                  ...localUiConfig,
+                  formats: [...localUiConfig.formats, { id: newId, label: 'Новый формат', suffix: '', decimals: 0 }]
+                });
+              }} className="text-sm text-emerald-400 flex items-center gap-1 mt-2"><Plus className="w-4 h-4"/> Добавить формат</button>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-bold text-white mb-4">Цвета акцента</h3>
+            <div className="space-y-2">
+              {localUiConfig.colors.map((col: any, idx: number) => (
+                <div key={idx} className="flex gap-2 items-center bg-zinc-900 p-2 rounded-lg">
+                  <div className={cn("w-4 h-4 rounded-full shrink-0", col.bgClass)} />
+                  <input value={col.id} readOnly className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-zinc-500 w-32 cursor-not-allowed" title="ID цвета (нельзя изменить)" />
+                  <input value={col.label} onChange={e => {
+                    const newColors = [...localUiConfig.colors];
+                    newColors[idx].label = e.target.value;
+                    setLocalUiConfig({ ...localUiConfig, colors: newColors });
+                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="Название" />
+                  <input value={col.colorClass} onChange={e => {
+                    const newColors = [...localUiConfig.colors];
+                    newColors[idx].colorClass = e.target.value;
+                    setLocalUiConfig({ ...localUiConfig, colors: newColors });
+                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="CSS класс текста (напр. text-red-500)" />
+                  <input value={col.bgClass} onChange={e => {
+                    const newColors = [...localUiConfig.colors];
+                    newColors[idx].bgClass = e.target.value;
+                    setLocalUiConfig({ ...localUiConfig, colors: newColors });
+                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="CSS класс фона (напр. bg-red-500)" />
+                  <button onClick={() => {
+                    const newColors = localUiConfig.colors.filter((_: any, i: number) => i !== idx);
+                    setLocalUiConfig({ ...localUiConfig, colors: newColors });
+                  }} className="p-2 text-red-400 hover:bg-red-400/10 rounded"><Trash2 className="w-4 h-4"/></button>
+                </div>
+              ))}
+              <button onClick={() => {
+                const newId = 'color_' + Date.now();
+                setLocalUiConfig({
+                  ...localUiConfig,
+                  colors: [...localUiConfig.colors, { id: newId, label: 'Новый цвет', colorClass: 'text-white', bgClass: 'bg-white' }]
+                });
+              }} className="text-sm text-emerald-400 flex items-center gap-1 mt-2"><Plus className="w-4 h-4"/> Добавить цвет</button>
+            </div>
+          </div>
+          
+          <div className="flex justify-end border-t border-zinc-800 pt-6 mt-4">
+            <button
+              onClick={() => onSave(items, statsItems, localUiConfig)}
+              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+            >
+              <Save className="w-4 h-4" />
+              Сохранить настройки
+            </button>
+          </div>
+        </div>
+      )}
+
       <AnimatePresence>
         {editingItem && (
           <EditAttributeModal
             item={editingItem.item}
+            uiConfig={localUiConfig}
             onSave={(updatedItem: any) => {
               // Update the item in statsItems or items
               if (activeTab === 'stats') {
