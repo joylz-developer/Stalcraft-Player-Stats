@@ -97,6 +97,35 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
   }
 }
 
+interface ToastMessage {
+  id: string;
+  message: string;
+  type: 'success' | 'error';
+}
+
+function Toast({ toast, onClose }: { toast: ToastMessage, onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg overflow-hidden relative pointer-events-auto flex flex-col w-64 animate-in slide-in-from-right-8 fade-in duration-300">
+      <div className="p-3 flex justify-between items-center">
+        <span className={cn("text-sm font-medium", toast.type === 'error' ? 'text-red-400' : 'text-emerald-400')}>
+          {toast.message}
+        </span>
+        <button onClick={onClose} className="text-zinc-400 hover:text-white transition-colors">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="h-1 bg-zinc-700 w-full">
+        <div className={cn("h-full", toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-500')} style={{ width: '100%', animation: 'shrink 3s linear forwards' }} />
+      </div>
+    </div>
+  );
+}
+
 interface HighlightConfig {
   id?: number;
   title: string;
@@ -482,6 +511,32 @@ export default function App() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [showChars, setShowChars] = useState(false);
   
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const addToast = React.useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = React.useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  const handleSaveConfig = async (newConfig: HighlightConfig[], newStatsConfig: StatGroupConfig[], newUiConfig: any) => {
+    try {
+      await axios.post('/api/admin/highlights', newConfig);
+      await axios.post('/api/admin/settings/stats_config', newStatsConfig);
+      await axios.post('/api/admin/settings/ui_config', newUiConfig);
+      setHighlightsConfig(newConfig);
+      setStatsConfig(newStatsConfig);
+      setUiConfig(newUiConfig);
+      addToast('Изменения сохранены');
+    } catch (e) {
+      console.error('Failed to save config', e);
+      addToast('Ошибка при сохранении', 'error');
+    }
+  };
+
   const [user, setUser] = useState<UserData | null>(null);
   const [highlightsConfig, setHighlightsConfig] = useState<HighlightConfig[]>([]);
   const [statsConfig, setStatsConfig] = useState<StatGroupConfig[]>([]);
@@ -675,6 +730,18 @@ export default function App() {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 font-sans selection:bg-emerald-500/30 pb-20">
+        <style>{`
+          @keyframes shrink {
+            from { width: 100%; }
+            to { width: 0%; }
+          }
+        `}</style>
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+          {toasts.map(toast => (
+            <Toast key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
+          ))}
+        </div>
+
         {/* Background effects */}
         <div className="fixed inset-0 z-0 pointer-events-none">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-emerald-500/10 blur-[120px] rounded-full opacity-50" />
@@ -785,20 +852,9 @@ export default function App() {
                 statsConfig={statsConfig}
                 uiConfig={uiConfig}
                 myCharacters={myCharacters}
-                onSave={async (newConfig, newStatsConfig, newUiConfig) => {
-                  try {
-                    await axios.post('/api/admin/highlights', newConfig);
-                    await axios.post('/api/admin/settings/stats_config', newStatsConfig);
-                    await axios.post('/api/admin/settings/ui_config', newUiConfig);
-                    setHighlightsConfig(newConfig);
-                    setStatsConfig(newStatsConfig);
-                    setUiConfig(newUiConfig);
-                    setShowAdmin(false);
-                  } catch (e) {
-                    alert('Ошибка сохранения');
-                  }
-                }} 
-                onClose={() => setShowAdmin(false)} 
+                onSave={handleSaveConfig} 
+                onClose={() => setShowAdmin(false)}
+                addToast={addToast}
               />
             </ErrorBoundary>
           ) : (
@@ -1300,6 +1356,15 @@ function EditAttributeModal({
   const [editedItem, setEditedItem] = useState(item);
   const formulaRef = React.useRef<any>(null);
 
+  const isInitialMount = React.useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    onSave(editedItem);
+  }, [editedItem]);
+
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => {
@@ -1441,13 +1506,7 @@ function EditAttributeModal({
               onClick={onClose}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium transition-colors"
             >
-              Отмена
-            </button>
-            <button
-              onClick={() => onSave(editedItem)}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-emerald-900/20"
-            >
-              Сохранить изменения
+              Закрыть
             </button>
           </div>
         </div>
@@ -1568,7 +1627,7 @@ function AttributeSidebar({
   );
 }
 
-function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClose }: { config: HighlightConfig[], statsConfig: StatGroupConfig[], uiConfig: any, myCharacters: any[], onSave: (c: HighlightConfig[], s: StatGroupConfig[], u: any) => void, onClose: () => void }) {
+function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClose, addToast }: { config: HighlightConfig[], statsConfig: StatGroupConfig[], uiConfig: any, myCharacters: any[], onSave: (c: HighlightConfig[], s: StatGroupConfig[], u: any) => void, onClose: () => void, addToast: (msg: string, type?: 'success'|'error') => void }) {
   const [activeTab, setActiveTab] = useState<'highlights' | 'stats' | 'users' | 'ui_settings'>('highlights');
   const [items, setItems] = useState<HighlightConfig[]>(config.map((c, i) => ({ ...c, id: c.id || `h_${Date.now()}_${i}` })));
   const [statsItems, setStatsItems] = useState<StatGroupConfig[]>(statsConfig);
@@ -1610,6 +1669,23 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
   const [previewRegion, setPreviewRegion] = useState<Region>('ru');
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingItem, setEditingItem] = useState<{ groupIdx: number | null, itemIdx: number, item: any } | null>(null);
+
+  const onSaveRef = useRef(onSave);
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    const timer = setTimeout(() => {
+      onSaveRef.current(items, statsItems, localUiConfig);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [items, statsItems, localUiConfig]);
 
   const onEditItem = (item: any, groupIdx: number | null, itemIdx: number) => {
     setEditingItem({ item, groupIdx, itemIdx });
@@ -1660,8 +1736,9 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
     try {
       await axios.post(`/api/admin/users/${userId}/role`, { role: newRole });
       fetchUsers();
+      addToast('Роль успешно изменена');
     } catch (e: any) {
-      alert(e.response?.data?.error || 'Ошибка при изменении роли');
+      addToast(e.response?.data?.error || 'Ошибка при изменении роли', 'error');
     }
   };
 
@@ -1898,13 +1975,6 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                       </button>
                     )}
                   </div>
-                  <button
-                    onClick={() => onSave(items, statsItems, localUiConfig)}
-                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
-                  >
-                    <Save className="w-4 h-4" />
-                    Сохранить настройки
-                  </button>
                 </div>
               </DndContext>
             )}
@@ -1958,13 +2028,6 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                       </button>
                     )}
                   </div>
-                  <button
-                    onClick={() => onSave(items, statsItems, localUiConfig)}
-                    className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
-                  >
-                    <Save className="w-4 h-4" />
-                    Сохранить настройки
-                  </button>
                 </div>
               </DndContext>
             )}
@@ -2056,7 +2119,7 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                     setLocalUiConfig({ ...localUiConfig, formats: newFormats });
                   }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1 font-mono" placeholder="Формула (напр. x * 100)" title="JavaScript формула, где x - исходное значение" />
                   <button onClick={() => {
-                    if (fmt.id === 'auto') return alert('Нельзя удалить автоматический формат');
+                    if (fmt.id === 'auto') return addToast('Нельзя удалить автоматический формат', 'error');
                     const newFormats = localUiConfig.formats.filter((_: any, i: number) => i !== idx);
                     setLocalUiConfig({ ...localUiConfig, formats: newFormats });
                   }} className="p-2 text-red-400 hover:bg-red-400/10 rounded"><Trash2 className="w-4 h-4"/></button>
@@ -2103,16 +2166,6 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
               }} className="text-sm text-emerald-400 flex items-center gap-1 mt-2"><Plus className="w-4 h-4"/> Добавить цвет</button>
             </div>
           </div>
-          
-          <div className="flex justify-end border-t border-zinc-800 pt-6 mt-4">
-            <button
-              onClick={() => onSave(items, statsItems, localUiConfig)}
-              className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/20"
-            >
-              <Save className="w-4 h-4" />
-              Сохранить настройки
-            </button>
-          </div>
         </div>
       )}
 
@@ -2131,7 +2184,6 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
               } else {
                 setItems(items.map(i => i.id === updatedItem.id ? updatedItem : i));
               }
-              setEditingItem(null);
             }}
             onClose={() => setEditingItem(null)}
             previewLoading={previewLoading}
