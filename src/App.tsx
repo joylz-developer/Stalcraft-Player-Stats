@@ -977,7 +977,7 @@ export default function App() {
   );
 }
 
-function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateStatGroup, removeStatGroup, addStatItem, removeStatItem, updateStatItem, setFocusedInput, isEditMode, onEditItem }: any) {
+function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateStatGroup, removeStatGroup, addStatItem, removeStatItem, updateStatItem, setFocusedInput, isEditMode, onEditItem, previewData, uiConfig }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
@@ -1045,6 +1045,8 @@ function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateS
                     isLast={originalIndex === group.items.length - 1}
                     isEditMode={isEditMode}
                     onEditItem={onEditItem}
+                    previewData={previewData}
+                    uiConfig={uiConfig}
                   />
                 );
               })}
@@ -1807,6 +1809,8 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                         setFocusedInput={setFocusedInput}
                         isEditMode={isEditMode}
                         onEditItem={onEditItem}
+                        previewData={previewData}
+                        uiConfig={localUiConfig}
                       />
                     ))}
                   </div>
@@ -1853,6 +1857,8 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                       setFocusedInput={setFocusedInput}
                       isEditMode={isEditMode}
                       onEditItem={onEditItem}
+                      previewData={previewData}
+                      uiConfig={localUiConfig}
                     />
                   ))}
                   
