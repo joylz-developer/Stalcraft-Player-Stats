@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Component, ErrorInfo } from 'react';
+import React, { useState, useEffect, Component, ErrorInfo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -1289,15 +1289,12 @@ function AttributeTooltip({ previewData }: { previewData: ProfileData | null }) 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      // Используем closest() для стабильного срабатывания при наведении
-      const attrElement = target?.closest?.('[data-attr]') as HTMLElement;
-      
-      if (attrElement && attrElement.dataset && attrElement.dataset.attr) {
+      if (target && target.dataset && target.dataset.attr) {
         setTooltip({
           visible: true,
           x: e.clientX,
           y: e.clientY,
-          attr: attrElement.dataset.attr
+          attr: target.dataset.attr
         });
       } else {
         setTooltip(prev => prev.visible ? { ...prev, visible: false } : prev);
@@ -1318,10 +1315,9 @@ function AttributeTooltip({ previewData }: { previewData: ProfileData | null }) 
   const x = Math.min(tooltip.x + 15, window.innerWidth - 220);
   const y = Math.min(tooltip.y + 15, window.innerHeight - 120);
 
-  // Формируем саму верстку тултипа
-  const tooltipContent = (
+  return (
     <div 
-      className="fixed z-[9999] pointer-events-none bg-zinc-900 border border-zinc-700 shadow-xl rounded-lg p-3 text-sm flex flex-col gap-1 min-w-[200px]"
+      className="fixed z-[100] pointer-events-none bg-zinc-900 border border-zinc-700 shadow-xl rounded-lg p-3 text-sm flex flex-col gap-1 min-w-[200px]"
       style={{ left: x, top: y }}
     >
       <div className="font-bold text-emerald-400 mb-1">{name}</div>
@@ -1341,10 +1337,6 @@ function AttributeTooltip({ previewData }: { previewData: ProfileData | null }) 
       )}
     </div>
   );
-
-  // Возвращаем тултип через createPortal, чтобы вытащить его из родительских div-ов 
-  // прямо в корень документа. Функция createPortal у вас уже импортирована в файле.
-  return createPortal(tooltipContent, document.body);
 }
 
 function EditAttributeModal({ 
