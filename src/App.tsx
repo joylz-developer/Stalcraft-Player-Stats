@@ -262,22 +262,22 @@ const formatStatValue = (id: string, type: string, value: any) => {
 
 export const DEFAULT_UI_CONFIG = {
   formats: [
-    { id: 'auto', label: 'Автоматически', suffix: '', decimals: 0 },
-    { id: 'number', label: 'Число', suffix: '', decimals: 0 },
-    { id: 'ratio', label: 'Дробь (2 знака)', suffix: '', decimals: 2 },
-    { id: 'percent', label: 'Процент', suffix: '%', decimals: 1 },
-    { id: 'duration', label: 'Время (Дни и часы)', suffix: '', decimals: 0, special: 'duration' },
-    { id: 'duration_hours', label: 'Время (Только часы)', suffix: ' ч.', decimals: 0, special: 'duration_hours' },
-    { id: 'date', label: 'Дата', suffix: '', decimals: 0, special: 'date' },
-    { id: 'distance', label: 'Дистанция (км)', suffix: ' км', decimals: 1, special: 'distance' }
+    { id: 'auto', label: 'Автоматически', suffix: '', decimals: 0, multiplier: 1 },
+    { id: 'number', label: 'Число', suffix: '', decimals: 0, multiplier: 1 },
+    { id: 'ratio', label: 'Дробь (2 знака)', suffix: '', decimals: 2, multiplier: 1 },
+    { id: 'percent', label: 'Процент', suffix: '%', decimals: 1, multiplier: 1 },
+    { id: 'duration', label: 'Время (Дни и часы)', suffix: '', decimals: 0, special: 'duration', multiplier: 1 },
+    { id: 'duration_hours', label: 'Время (Только часы)', suffix: ' ч.', decimals: 0, special: 'duration_hours', multiplier: 1 },
+    { id: 'date', label: 'Дата', suffix: '', decimals: 0, special: 'date', multiplier: 1 },
+    { id: 'distance', label: 'Дистанция (км)', suffix: ' км', decimals: 1, special: 'distance', multiplier: 1 }
   ],
   colors: [
-    { id: 'text-white', label: 'Белый', colorClass: 'text-white', bgClass: 'bg-white' },
-    { id: 'text-emerald-400', label: 'Изумрудный', colorClass: 'text-emerald-400', bgClass: 'bg-emerald-400' },
-    { id: 'text-blue-400', label: 'Синий', colorClass: 'text-blue-400', bgClass: 'bg-blue-400' },
-    { id: 'text-amber-400', label: 'Желтый', colorClass: 'text-amber-400', bgClass: 'bg-amber-400' },
-    { id: 'text-red-400', label: 'Красный', colorClass: 'text-red-400', bgClass: 'bg-red-400' },
-    { id: 'text-purple-400', label: 'Фиолетовый', colorClass: 'text-purple-400', bgClass: 'bg-purple-400' }
+    { id: 'text-white', label: 'Белый', hex: '#ffffff' },
+    { id: 'text-emerald-400', label: 'Изумрудный', hex: '#34d399' },
+    { id: 'text-blue-400', label: 'Синий', hex: '#60a5fa' },
+    { id: 'text-amber-400', label: 'Желтый', hex: '#fbbf24' },
+    { id: 'text-red-400', label: 'Красный', hex: '#f87171' },
+    { id: 'text-purple-400', label: 'Фиолетовый', hex: '#c084fc' }
   ]
 };
 
@@ -286,24 +286,27 @@ export const formatCustomValue = (val: number | null, formatId: string, formats:
   const format = formats.find((f: any) => f.id === formatId);
   if (!format) return String(val);
 
+  const multiplier = format.multiplier !== undefined ? format.multiplier : 1;
+  const adjustedVal = val * multiplier;
+
   if (format.special === 'duration') {
-    const hours = Math.floor(val / (1000 * 60 * 60));
+    const hours = Math.floor(adjustedVal / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
     const remHours = hours % 24;
     return `${days} д. ${remHours} ч.`;
   }
   if (format.special === 'duration_hours') {
-    const hours = Math.floor(val / (1000 * 60 * 60));
+    const hours = Math.floor(adjustedVal / (1000 * 60 * 60));
     return `${hours} ч.`;
   }
   if (format.special === 'date') {
-    return new Date(val).toLocaleDateString('ru-RU');
+    return new Date(adjustedVal).toLocaleDateString('ru-RU');
   }
   if (format.special === 'distance') {
-    return (val / 100000).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 1 }) + (format.suffix || ' км');
+    return (adjustedVal / 100000).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 1 }) + (format.suffix || ' км');
   }
 
-  let numStr = Number(val).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 0 });
+  let numStr = Number(adjustedVal).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 0 });
   return `${numStr}${format.suffix ? ' ' + format.suffix : ''}`;
 };
 
@@ -881,13 +884,14 @@ export default function App() {
                           {highlightsConfig.map((config, idx) => {
                             const val = evaluateFormula(config.formula, profileData.stats);
                             const displayVal = formatCustomValue(val, config.format, uiConfig.formats);
-                            const colorObj = uiConfig.colors.find(c => c.id === config.color);
-                            const colorClass = colorObj ? colorObj.colorClass : config.color;
+                            const colorObj = uiConfig.colors.find((c: any) => c.id === config.color);
+                            const hexColor = colorObj ? colorObj.hex : undefined;
+                            const legacyColorClass = !colorObj ? config.color : undefined;
 
                             return (
                               <div key={idx} className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-4 text-center">
                                 <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">{config.title}</div>
-                                <div className={cn("text-2xl font-bold", colorClass)}>{displayVal}</div>
+                                <div className={cn("text-2xl font-bold", hexColor ? "" : legacyColorClass)} style={hexColor ? { color: hexColor } : {}}>{displayVal}</div>
                               </div>
                             );
                           })}
@@ -1142,7 +1146,8 @@ function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedIn
   const previewValue = evaluateFormula(item.formula, previewData?.stats || []);
   const displayVal = formatCustomValue(previewValue, item.format, uiConfig.formats);
   const colorObj = uiConfig.colors.find((c: any) => c.id === item.color);
-  const bgClass = colorObj ? colorObj.bgClass : (item.color ? item.color.replace('text-', 'bg-') : 'bg-white');
+  const hexColor = colorObj ? colorObj.hex : undefined;
+  const legacyBgClass = !colorObj && item.color ? item.color.replace('text-', 'bg-') : 'bg-white';
 
   return (
     <div 
@@ -1163,7 +1168,7 @@ function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedIn
       
       <div className="flex-1 flex items-center justify-between w-full pl-6 pr-8">
         <div className="flex items-center gap-4">
-          <div className={cn("w-3 h-3 rounded-full", bgClass)} />
+          <div className={cn("w-3 h-3 rounded-full", hexColor ? "" : legacyBgClass)} style={hexColor ? { backgroundColor: hexColor } : {}} />
           <span className="text-zinc-300 font-medium">{item.title || 'Без названия'}</span>
         </div>
         <div className="text-zinc-500 font-mono text-xs break-words max-w-[200px] text-right">
@@ -1383,7 +1388,7 @@ function EditAttributeModal({
                           : "bg-zinc-900 text-zinc-400 border-zinc-800 hover:bg-zinc-800 hover:text-zinc-300"
                       )}
                     >
-                      <div className={cn("w-2 h-2 rounded-full", opt.bgClass)} />
+                      <div className={cn("w-2 h-2 rounded-full", opt.hex ? "" : opt.bgClass)} style={opt.hex ? { backgroundColor: opt.hex } : {}} />
                       {opt.label}
                     </button>
                   ))}
@@ -1980,6 +1985,11 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                     newFormats[idx].suffix = e.target.value;
                     setLocalUiConfig({ ...localUiConfig, formats: newFormats });
                   }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-24" placeholder="Суффикс (напр. %)" />
+                  <input type="number" value={fmt.multiplier !== undefined ? fmt.multiplier : 1} onChange={e => {
+                    const newFormats = [...localUiConfig.formats];
+                    newFormats[idx].multiplier = parseFloat(e.target.value) || 1;
+                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-24" placeholder="Множитель" title="Множитель (напр. 0.00001 для перевода см в км)" step="any" />
                   <input type="number" value={fmt.decimals || 0} onChange={e => {
                     const newFormats = [...localUiConfig.formats];
                     newFormats[idx].decimals = parseInt(e.target.value) || 0;
@@ -2007,23 +2017,18 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
             <div className="space-y-2">
               {localUiConfig.colors.map((col: any, idx: number) => (
                 <div key={idx} className="flex gap-2 items-center bg-zinc-900 p-2 rounded-lg">
-                  <div className={cn("w-4 h-4 rounded-full shrink-0", col.bgClass)} />
+                  <div className={cn("w-4 h-4 rounded-full shrink-0", col.hex ? "" : col.bgClass)} style={col.hex ? { backgroundColor: col.hex } : {}} />
                   <input value={col.id} readOnly className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-zinc-500 w-32 cursor-not-allowed" title="ID цвета (нельзя изменить)" />
                   <input value={col.label} onChange={e => {
                     const newColors = [...localUiConfig.colors];
                     newColors[idx].label = e.target.value;
                     setLocalUiConfig({ ...localUiConfig, colors: newColors });
                   }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="Название" />
-                  <input value={col.colorClass} onChange={e => {
+                  <input type="color" value={col.hex || '#ffffff'} onChange={e => {
                     const newColors = [...localUiConfig.colors];
-                    newColors[idx].colorClass = e.target.value;
+                    newColors[idx].hex = e.target.value;
                     setLocalUiConfig({ ...localUiConfig, colors: newColors });
-                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="CSS класс текста (напр. text-red-500)" />
-                  <input value={col.bgClass} onChange={e => {
-                    const newColors = [...localUiConfig.colors];
-                    newColors[idx].bgClass = e.target.value;
-                    setLocalUiConfig({ ...localUiConfig, colors: newColors });
-                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="CSS класс фона (напр. bg-red-500)" />
+                  }} className="bg-zinc-950 border border-zinc-800 rounded p-0 w-10 h-8 cursor-pointer" title="Выбрать цвет" />
                   <button onClick={() => {
                     const newColors = localUiConfig.colors.filter((_: any, i: number) => i !== idx);
                     setLocalUiConfig({ ...localUiConfig, colors: newColors });
@@ -2034,7 +2039,7 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                 const newId = 'color_' + Date.now();
                 setLocalUiConfig({
                   ...localUiConfig,
-                  colors: [...localUiConfig.colors, { id: newId, label: 'Новый цвет', colorClass: 'text-white', bgClass: 'bg-white' }]
+                  colors: [...localUiConfig.colors, { id: newId, label: 'Новый цвет', hex: '#ffffff' }]
                 });
               }} className="text-sm text-emerald-400 flex items-center gap-1 mt-2"><Plus className="w-4 h-4"/> Добавить цвет</button>
             </div>
