@@ -262,14 +262,14 @@ const formatStatValue = (id: string, type: string, value: any) => {
 
 export const DEFAULT_UI_CONFIG = {
   formats: [
-    { id: 'auto', label: 'Автоматически', suffix: '', decimals: 0, multiplier: 1 },
-    { id: 'number', label: 'Число', suffix: '', decimals: 0, multiplier: 1 },
-    { id: 'ratio', label: 'Дробь (2 знака)', suffix: '', decimals: 2, multiplier: 1 },
-    { id: 'percent', label: 'Процент', suffix: '%', decimals: 1, multiplier: 1 },
-    { id: 'duration', label: 'Время (Дни и часы)', suffix: '', decimals: 0, special: 'duration', multiplier: 1 },
-    { id: 'duration_hours', label: 'Время (Только часы)', suffix: ' ч.', decimals: 0, special: 'duration_hours', multiplier: 1 },
-    { id: 'date', label: 'Дата', suffix: '', decimals: 0, special: 'date', multiplier: 1 },
-    { id: 'distance', label: 'Дистанция (км)', suffix: ' км', decimals: 1, special: 'distance', multiplier: 1 }
+    { id: 'auto', label: 'Автоматически', suffix: '', formula: 'x' },
+    { id: 'number', label: 'Число', suffix: '', formula: 'x' },
+    { id: 'ratio', label: 'Дробь (2 знака)', suffix: '', formula: 'x.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })' },
+    { id: 'percent', label: 'Процент', suffix: '%', formula: 'x.toLocaleString("ru-RU", { maximumFractionDigits: 1 })' },
+    { id: 'duration', label: 'Время (Дни и часы)', suffix: '', formula: 'Math.floor(x / 86400000) + " д. " + Math.floor((x / 3600000) % 24) + " ч."' },
+    { id: 'duration_hours', label: 'Время (Только часы)', suffix: ' ч.', formula: 'Math.floor(x / 3600000)' },
+    { id: 'date', label: 'Дата', suffix: '', formula: 'new Date(x).toLocaleDateString("ru-RU")' },
+    { id: 'distance', label: 'Дистанция (км)', suffix: ' км', formula: '(x / 100000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })' }
   ],
   colors: [
     { id: 'text-white', label: 'Белый', hex: '#ffffff' },
@@ -286,28 +286,55 @@ export const formatCustomValue = (val: number | null, formatId: string, formats:
   const format = formats.find((f: any) => f.id === formatId);
   if (!format) return String(val);
 
-  const multiplier = format.multiplier !== undefined ? format.multiplier : 1;
-  const adjustedVal = val * multiplier;
+  let resultVal: any = val;
 
-  if (format.special === 'duration') {
-    const hours = Math.floor(adjustedVal / (1000 * 60 * 60));
-    const days = Math.floor(hours / 24);
-    const remHours = hours % 24;
-    return `${days} д. ${remHours} ч.`;
-  }
-  if (format.special === 'duration_hours') {
-    const hours = Math.floor(adjustedVal / (1000 * 60 * 60));
-    return `${hours} ч.`;
-  }
-  if (format.special === 'date') {
-    return new Date(adjustedVal).toLocaleDateString('ru-RU');
-  }
-  if (format.special === 'distance') {
-    return (adjustedVal / 100000).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 1 }) + (format.suffix || ' км');
+  if (format.formula) {
+    try {
+      const fn = new Function('x', `return ${format.formula}`);
+      resultVal = fn(val);
+    } catch (e) {
+      console.error('Formula error', e);
+      resultVal = 'Ошибка';
+    }
+  } else {
+    // Legacy fallback
+    const multiplier = format.multiplier !== undefined ? format.multiplier : 1;
+    const adjustedVal = val * multiplier;
+
+    if (format.special === 'duration') {
+      const hours = Math.floor(adjustedVal / (1000 * 60 * 60));
+      const days = Math.floor(hours / 24);
+      const remHours = hours % 24;
+      return `${days} д. ${remHours} ч.`;
+    }
+    if (format.special === 'duration_hours') {
+      const hours = Math.floor(adjustedVal / (1000 * 60 * 60));
+      return `${hours} ч.`;
+    }
+    if (format.special === 'date') {
+      return new Date(adjustedVal).toLocaleDateString('ru-RU');
+    }
+    if (format.special === 'distance') {
+      return (adjustedVal / 100000).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 1 }) + (format.suffix ? ' ' + format.suffix : ' км');
+    }
+
+    if (format.id === 'ratio') {
+      resultVal = adjustedVal.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    } else if (format.id === 'percent') {
+      resultVal = adjustedVal.toLocaleString("ru-RU", { maximumFractionDigits: 1 });
+    } else {
+      resultVal = adjustedVal.toLocaleString('ru-RU', { minimumFractionDigits: format.decimals || 0, maximumFractionDigits: format.decimals || 0 });
+    }
   }
 
-  let numStr = Number(adjustedVal).toLocaleString('ru-RU', { maximumFractionDigits: format.decimals || 0 });
-  return `${numStr}${format.suffix ? ' ' + format.suffix : ''}`;
+  let finalStr = '';
+  if (typeof resultVal === 'number') {
+    finalStr = resultVal.toLocaleString('ru-RU');
+  } else {
+    finalStr = String(resultVal);
+  }
+
+  return `${finalStr}${format.suffix ? ' ' + format.suffix : ''}`;
 };
 
 const evaluateFormula = (formula: string, stats: StatItem[]) => {
@@ -1533,7 +1560,24 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
   const [activeTab, setActiveTab] = useState<'highlights' | 'stats' | 'users' | 'ui_settings'>('highlights');
   const [items, setItems] = useState<HighlightConfig[]>(config.map((c, i) => ({ ...c, id: c.id || `h_${Date.now()}_${i}` })));
   const [statsItems, setStatsItems] = useState<StatGroupConfig[]>(statsConfig);
-  const [localUiConfig, setLocalUiConfig] = useState(uiConfig);
+  const [localUiConfig, setLocalUiConfig] = useState(() => {
+    const formats = (uiConfig.formats || []).map((fmt: any) => {
+      if (fmt.formula) return fmt;
+      let formula = 'x';
+      if (fmt.special === 'duration') formula = 'Math.floor(x / 86400000) + " д. " + Math.floor((x / 3600000) % 24) + " ч."';
+      else if (fmt.special === 'duration_hours') formula = 'Math.floor(x / 3600000)';
+      else if (fmt.special === 'date') formula = 'new Date(x).toLocaleDateString("ru-RU")';
+      else if (fmt.special === 'distance') formula = `(x / 100000).toLocaleString("ru-RU", { maximumFractionDigits: ${fmt.decimals || 1} })`;
+      else if (fmt.id === 'ratio') formula = 'x.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })';
+      else if (fmt.id === 'percent') formula = 'x.toLocaleString("ru-RU", { maximumFractionDigits: 1 })';
+      else {
+        if (fmt.multiplier && fmt.multiplier !== 1) formula = `x * ${fmt.multiplier}`;
+        if (fmt.decimals) formula = `(${formula}).toLocaleString("ru-RU", { minimumFractionDigits: ${fmt.decimals}, maximumFractionDigits: ${fmt.decimals} })`;
+      }
+      return { ...fmt, formula };
+    });
+    return { ...uiConfig, formats };
+  });
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [focusedInput, setFocusedInput] = useState<{ type: 'highlight' | 'stat', groupIndex?: number, itemIndex: number, ref?: HTMLInputElement | null, insert?: (attr: string) => void } | null>(null);
