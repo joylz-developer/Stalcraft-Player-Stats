@@ -264,12 +264,12 @@ export const DEFAULT_UI_CONFIG = {
   formats: [
     { id: 'auto', label: 'Автоматически', suffix: '', formula: 'x' },
     { id: 'number', label: 'Число', suffix: '', formula: 'x' },
-    { id: 'ratio', label: 'Дробь (2 знака)', suffix: '', formula: 'x.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })' },
-    { id: 'percent', label: 'Процент', suffix: '%', formula: 'x.toLocaleString("ru-RU", { maximumFractionDigits: 1 })' },
+    { id: 'ratio', label: 'Дробь (2 знака)', suffix: '', formula: 'x.toFixed(2)' },
+    { id: 'percent', label: 'Процент', suffix: '%', formula: 'x.toFixed(1)' },
     { id: 'duration', label: 'Время (Дни и часы)', suffix: '', formula: 'Math.floor(x / 86400000) + " д. " + Math.floor((x / 3600000) % 24) + " ч."' },
     { id: 'duration_hours', label: 'Время (Только часы)', suffix: ' ч.', formula: 'Math.floor(x / 3600000)' },
-    { id: 'date', label: 'Дата', suffix: '', formula: 'new Date(x).toLocaleDateString("ru-RU")' },
-    { id: 'distance', label: 'Дистанция (км)', suffix: ' км', formula: '(x / 100000).toLocaleString("ru-RU", { maximumFractionDigits: 1 })' }
+    { id: 'date', label: 'Дата', suffix: '', formula: 'new Date(x)' },
+    { id: 'distance', label: 'Дистанция (км)', suffix: ' км', formula: '(x / 100000).toFixed(1)' }
   ],
   colors: [
     { id: 'text-white', label: 'Белый', hex: '#ffffff' },
@@ -328,8 +328,20 @@ export const formatCustomValue = (val: number | null, formatId: string, formats:
   }
 
   let finalStr = '';
-  if (typeof resultVal === 'number') {
-    finalStr = resultVal.toLocaleString('ru-RU');
+  if (resultVal instanceof Date) {
+    if (isNaN(resultVal.getTime())) {
+      finalStr = 'Неверная дата';
+    } else {
+      finalStr = resultVal.toLocaleDateString('ru-RU');
+    }
+  } else if (typeof resultVal === 'number') {
+    const parts = resultVal.toString().split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    finalStr = parts.join(',');
+  } else if (typeof resultVal === 'string' && /^-?\d+(\.\d+)?$/.test(resultVal)) {
+    const parts = resultVal.split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    finalStr = parts.join(',');
   } else {
     finalStr = String(resultVal);
   }
@@ -1562,17 +1574,27 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
   const [statsItems, setStatsItems] = useState<StatGroupConfig[]>(statsConfig);
   const [localUiConfig, setLocalUiConfig] = useState(() => {
     const formats = (uiConfig.formats || []).map((fmt: any) => {
-      if (fmt.formula) return fmt;
+      if (fmt.formula) {
+        let f = fmt.formula;
+        if (f.includes('toLocaleString')) {
+          f = f.replace(/\.toLocaleString\("ru-RU",\s*\{\s*minimumFractionDigits:\s*(\d+),\s*maximumFractionDigits:\s*\d+\s*\}\)/g, '.toFixed($1)');
+          f = f.replace(/\.toLocaleString\("ru-RU",\s*\{\s*maximumFractionDigits:\s*(\d+)\s*\}\)/g, '.toFixed($1)');
+        }
+        if (f.includes('toLocaleDateString')) {
+          f = f.replace(/\.toLocaleDateString\("ru-RU"\)/g, '');
+        }
+        return { ...fmt, formula: f };
+      }
       let formula = 'x';
       if (fmt.special === 'duration') formula = 'Math.floor(x / 86400000) + " д. " + Math.floor((x / 3600000) % 24) + " ч."';
       else if (fmt.special === 'duration_hours') formula = 'Math.floor(x / 3600000)';
-      else if (fmt.special === 'date') formula = 'new Date(x).toLocaleDateString("ru-RU")';
-      else if (fmt.special === 'distance') formula = `(x / 100000).toLocaleString("ru-RU", { maximumFractionDigits: ${fmt.decimals || 1} })`;
-      else if (fmt.id === 'ratio') formula = 'x.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })';
-      else if (fmt.id === 'percent') formula = 'x.toLocaleString("ru-RU", { maximumFractionDigits: 1 })';
+      else if (fmt.special === 'date') formula = 'new Date(x)';
+      else if (fmt.special === 'distance') formula = `(x / 100000).toFixed(${fmt.decimals || 1})`;
+      else if (fmt.id === 'ratio') formula = 'x.toFixed(2)';
+      else if (fmt.id === 'percent') formula = 'x.toFixed(1)';
       else {
         if (fmt.multiplier && fmt.multiplier !== 1) formula = `x * ${fmt.multiplier}`;
-        if (fmt.decimals) formula = `(${formula}).toLocaleString("ru-RU", { minimumFractionDigits: ${fmt.decimals}, maximumFractionDigits: ${fmt.decimals} })`;
+        if (fmt.decimals) formula = `(${formula}).toFixed(${fmt.decimals})`;
       }
       return { ...fmt, formula };
     });
@@ -2018,7 +2040,6 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
             <div className="space-y-2">
               {localUiConfig.formats.map((fmt: any, idx: number) => (
                 <div key={idx} className="flex gap-2 items-center bg-zinc-900 p-2 rounded-lg">
-                  <input value={fmt.id} readOnly className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-zinc-500 w-32 cursor-not-allowed" title="ID формата (нельзя изменить)" />
                   <input value={fmt.label} onChange={e => {
                     const newFormats = [...localUiConfig.formats];
                     newFormats[idx].label = e.target.value;
@@ -2057,7 +2078,6 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
               {localUiConfig.colors.map((col: any, idx: number) => (
                 <div key={idx} className="flex gap-2 items-center bg-zinc-900 p-2 rounded-lg">
                   <div className={cn("w-4 h-4 rounded-full shrink-0", col.hex ? "" : col.bgClass)} style={col.hex ? { backgroundColor: col.hex } : {}} />
-                  <input value={col.id} readOnly className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-zinc-500 w-32 cursor-not-allowed" title="ID цвета (нельзя изменить)" />
                   <input value={col.label} onChange={e => {
                     const newColors = [...localUiConfig.colors];
                     newColors[idx].label = e.target.value;
