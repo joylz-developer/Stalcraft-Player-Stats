@@ -2029,16 +2029,11 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                     newFormats[idx].suffix = e.target.value;
                     setLocalUiConfig({ ...localUiConfig, formats: newFormats });
                   }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-24" placeholder="Суффикс (напр. %)" />
-                  <input type="number" value={fmt.multiplier !== undefined ? fmt.multiplier : 1} onChange={e => {
+                  <input value={fmt.formula || 'x'} onChange={e => {
                     const newFormats = [...localUiConfig.formats];
-                    newFormats[idx].multiplier = parseFloat(e.target.value) || 1;
+                    newFormats[idx].formula = e.target.value;
                     setLocalUiConfig({ ...localUiConfig, formats: newFormats });
-                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-24" placeholder="Множитель" title="Множитель (напр. 0.00001 для перевода см в км)" step="any" />
-                  <input type="number" value={fmt.decimals || 0} onChange={e => {
-                    const newFormats = [...localUiConfig.formats];
-                    newFormats[idx].decimals = parseInt(e.target.value) || 0;
-                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
-                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-20" placeholder="Дроби" />
+                  }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1 font-mono" placeholder="Формула (напр. x * 100)" title="JavaScript формула, где x - исходное значение" />
                   <button onClick={() => {
                     if (fmt.id === 'auto') return alert('Нельзя удалить автоматический формат');
                     const newFormats = localUiConfig.formats.filter((_: any, i: number) => i !== idx);
@@ -2050,7 +2045,7 @@ function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClo
                 const newId = 'custom_' + Date.now();
                 setLocalUiConfig({
                   ...localUiConfig,
-                  formats: [...localUiConfig.formats, { id: newId, label: 'Новый формат', suffix: '', decimals: 0 }]
+                  formats: [...localUiConfig.formats, { id: newId, label: 'Новый формат', suffix: '', formula: 'x' }]
                 });
               }} className="text-sm text-emerald-400 flex items-center gap-1 mt-2"><Plus className="w-4 h-4"/> Добавить формат</button>
             </div>
