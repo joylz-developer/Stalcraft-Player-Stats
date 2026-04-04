@@ -5,8 +5,9 @@ import { GripVertical, Trash2, Plus, Activity } from 'lucide-react';
 import { ICON_MAP } from '../constants';
 import { cn } from '../utils/cn';
 import { evaluateFormula, formatStatValue, formatCustomValue } from '../utils/formulas';
+import { useStore } from '../store/useStore';
 
-export function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateStatGroup, removeStatGroup, addStatItem, removeStatItem, updateStatItem, setFocusedInput, isEditMode, onEditItem, previewData, uiConfig }: any) {
+export function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, updateStatGroup, removeStatGroup, addStatItem, removeStatItem, updateStatItem, setFocusedInput, isEditMode, onEditItem, previewData }: any) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: group.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
@@ -75,7 +76,6 @@ export function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, 
                     isEditMode={isEditMode}
                     onEditItem={onEditItem}
                     previewData={previewData}
-                    uiConfig={uiConfig}
                   />
                 );
               })}
@@ -96,7 +96,8 @@ export function SortableStatGroup({ group, groupIdx, statsItems, setStatsItems, 
   );
 }
 
-export function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput, isLast, isEditMode, onEditItem, previewData, uiConfig }: any) {
+export function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStatsItems, removeStatItem, updateStatItem, setFocusedInput, isLast, isEditMode, onEditItem, previewData }: any) {
+  const { uiConfig } = useStore();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 
@@ -160,7 +161,8 @@ export function SortableStatItem({ item, groupIdx, itemIdx, statsItems, setStats
   );
 }
 
-export function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput, isEditMode, onEditItem, previewData, uiConfig }: any) {
+export function SortableHighlightItem({ item, idx, updateItem, removeItem, setFocusedInput, isEditMode, onEditItem, previewData }: any) {
+  const { uiConfig } = useStore();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const style = { 
     transform: CSS.Transform.toString(transform), 

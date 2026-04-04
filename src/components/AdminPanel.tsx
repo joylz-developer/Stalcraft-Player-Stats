@@ -24,38 +24,20 @@ import { SortableHighlightItem, SortableStatGroup } from './SortableComponents';
 import { EditAttributeModal } from './EditAttributeModal';
 import { AttributeTooltip } from './AttributeTooltip';
 
-export function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave, onClose, addToast }: { config: HighlightConfig[], statsConfig: StatGroupConfig[], uiConfig: any, myCharacters: any[], onSave: (c: HighlightConfig[], s: StatGroupConfig[], u: any) => void, onClose: () => void, addToast: (msg: string, type?: 'success'|'error') => void }) {
+import { useStore } from '../store/useStore';
+
+export function AdminPanel({ onClose }: { onClose: () => void }) {
+  const { 
+    highlightsConfig, setHighlightsConfig,
+    statsConfig, setStatsConfig,
+    uiConfig, setUiConfig,
+    myCharacters, addToast
+  } = useStore();
+
   const [activeTab, setActiveTab] = useState<'highlights' | 'stats' | 'users' | 'ui_settings'>('highlights');
-  const [items, setItems] = useState<HighlightConfig[]>(config.map((c, i) => ({ ...c, id: c.id || `h_${Date.now()}_${i}` })));
+  const [items, setItems] = useState<HighlightConfig[]>(highlightsConfig.map((c, i) => ({ ...c, id: c.id || `h_${Date.now()}_${i}` })));
   const [statsItems, setStatsItems] = useState<StatGroupConfig[]>(statsConfig);
-  const [localUiConfig, setLocalUiConfig] = useState(() => {
-    const formats = (uiConfig.formats || []).map((fmt: any) => {
-      if (fmt.formula) {
-        let f = fmt.formula;
-        if (f.includes('toLocaleString')) {
-          f = f.replace(/\.toLocaleString\("ru-RU",\s*\{\s*minimumFractionDigits:\s*(\d+),\s*maximumFractionDigits:\s*\d+\s*\}\)/g, '.toFixed($1)');
-          f = f.replace(/\.toLocaleString\("ru-RU",\s*\{\s*maximumFractionDigits:\s*(\d+)\s*\}\)/g, '.toFixed($1)');
-        }
-        if (f.includes('toLocaleDateString')) {
-          f = f.replace(/\.toLocaleDateString\("ru-RU"\)/g, '');
-        }
-        return { ...fmt, formula: f };
-      }
-      let formula = 'x';
-      if (fmt.special === 'duration') formula = 'Math.floor(x / 86400000) + " д. " + Math.floor((x / 3600000) % 24) + " ч."';
-      else if (fmt.special === 'duration_hours') formula = 'Math.floor(x / 3600000)';
-      else if (fmt.special === 'date') formula = 'new Date(x)';
-      else if (fmt.special === 'distance') formula = `(x / 100000).toFixed(${fmt.decimals || 1})`;
-      else if (fmt.id === 'ratio') formula = 'x.toFixed(2)';
-      else if (fmt.id === 'percent') formula = 'x.toFixed(1)';
-      else {
-        if (fmt.multiplier && fmt.multiplier !== 1) formula = `x * ${fmt.multiplier}`;
-        if (fmt.decimals) formula = `(${formula}).toFixed(${fmt.decimals})`;
-      }
-      return { ...fmt, formula };
-    });
-    return { ...uiConfig, formats };
-  });
+  
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [focusedInput, setFocusedInput] = useState<{ type: 'highlight' | 'stat', groupIndex?: number, itemIndex: number, ref?: HTMLInputElement | null, insert?: (attr: string) => void } | null>(null);
@@ -67,10 +49,25 @@ export function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingItem, setEditingItem] = useState<{ groupIdx: number | null, itemIdx: number, item: any } | null>(null);
 
-  const onSaveRef = useRef(onSave);
+  const handleSaveConfig = async (newConfig: HighlightConfig[], newStatsConfig: StatGroupConfig[], newUiConfig: any) => {
+    try {
+      await axios.post('/api/admin/highlights', newConfig);
+      await axios.post('/api/admin/settings/stats_config', newStatsConfig);
+      await axios.post('/api/admin/settings/ui_config', newUiConfig);
+      setHighlightsConfig(newConfig);
+      setStatsConfig(newStatsConfig);
+      setUiConfig(newUiConfig);
+      addToast('Изменения сохранены');
+    } catch (e) {
+      console.error('Failed to save config', e);
+      addToast('Ошибка при сохранении', 'error');
+    }
+  };
+
+  const onSaveRef = useRef(handleSaveConfig);
   useEffect(() => {
-    onSaveRef.current = onSave;
-  }, [onSave]);
+    onSaveRef.current = handleSaveConfig;
+  }, [highlightsConfig, statsConfig, uiConfig]);
 
   const isInitialMount = useRef(true);
   useEffect(() => {
@@ -79,10 +76,10 @@ export function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave
       return;
     }
     const timer = setTimeout(() => {
-      onSaveRef.current(items, statsItems, localUiConfig);
+      onSaveRef.current(items, statsItems, uiConfig);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [items, statsItems, localUiConfig]);
+  }, [items, statsItems, uiConfig]);
 
   const onEditItem = (item: any, groupIdx: number | null, itemIdx: number) => {
     setEditingItem({ item, groupIdx, itemIdx });
@@ -352,7 +349,6 @@ export function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave
                         isEditMode={isEditMode}
                         onEditItem={onEditItem}
                         previewData={previewData}
-                        uiConfig={localUiConfig}
                       />
                     ))}
                   </div>
@@ -393,7 +389,6 @@ export function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave
                       isEditMode={isEditMode}
                       onEditItem={onEditItem}
                       previewData={previewData}
-                      uiConfig={localUiConfig}
                     />
                   ))}
                   
@@ -495,35 +490,35 @@ export function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave
           <div>
             <h3 className="text-xl font-bold text-white mb-4">Форматы отображения</h3>
             <div className="space-y-2">
-              {localUiConfig.formats.map((fmt: any, idx: number) => (
+              {uiConfig.formats.map((fmt: any, idx: number) => (
                 <div key={idx} className="flex gap-2 items-center bg-zinc-900 p-2 rounded-lg">
                   <input value={fmt.label} onChange={e => {
-                    const newFormats = [...localUiConfig.formats];
+                    const newFormats = [...uiConfig.formats];
                     newFormats[idx].label = e.target.value;
-                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                    setUiConfig({ ...uiConfig, formats: newFormats });
                   }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="Название" />
                   <input value={fmt.suffix || ''} onChange={e => {
-                    const newFormats = [...localUiConfig.formats];
+                    const newFormats = [...uiConfig.formats];
                     newFormats[idx].suffix = e.target.value;
-                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                    setUiConfig({ ...uiConfig, formats: newFormats });
                   }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white w-24" placeholder="Суффикс (напр. %)" />
                   <input value={fmt.formula || 'x'} onChange={e => {
-                    const newFormats = [...localUiConfig.formats];
+                    const newFormats = [...uiConfig.formats];
                     newFormats[idx].formula = e.target.value;
-                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                    setUiConfig({ ...uiConfig, formats: newFormats });
                   }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1 font-mono" placeholder="Формула (напр. x * 100)" title="JavaScript формула, где x - исходное значение" />
                   <button onClick={() => {
                     if (fmt.id === 'auto') return addToast('Нельзя удалить автоматический формат', 'error');
-                    const newFormats = localUiConfig.formats.filter((_: any, i: number) => i !== idx);
-                    setLocalUiConfig({ ...localUiConfig, formats: newFormats });
+                    const newFormats = uiConfig.formats.filter((_: any, i: number) => i !== idx);
+                    setUiConfig({ ...uiConfig, formats: newFormats });
                   }} className="p-2 text-red-400 hover:bg-red-400/10 rounded"><Trash2 className="w-4 h-4"/></button>
                 </div>
               ))}
               <button onClick={() => {
                 const newId = 'custom_' + Date.now();
-                setLocalUiConfig({
-                  ...localUiConfig,
-                  formats: [...localUiConfig.formats, { id: newId, label: 'Новый формат', suffix: '', formula: 'x' }]
+                setUiConfig({
+                  ...uiConfig,
+                  formats: [...uiConfig.formats, { id: newId, label: 'Новый формат', suffix: '', formula: 'x' }]
                 });
               }} className="text-sm text-emerald-400 flex items-center gap-1 mt-2"><Plus className="w-4 h-4"/> Добавить формат</button>
             </div>
@@ -532,30 +527,30 @@ export function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave
           <div>
             <h3 className="text-xl font-bold text-white mb-4">Цвета акцента</h3>
             <div className="space-y-2">
-              {localUiConfig.colors.map((col: any, idx: number) => (
+              {uiConfig.colors.map((col: any, idx: number) => (
                 <div key={idx} className="flex gap-2 items-center bg-zinc-900 p-2 rounded-lg">
                   <div className={cn("w-4 h-4 rounded-full shrink-0", col.hex ? "" : col.bgClass)} style={col.hex ? { backgroundColor: col.hex } : {}} />
                   <input value={col.label} onChange={e => {
-                    const newColors = [...localUiConfig.colors];
+                    const newColors = [...uiConfig.colors];
                     newColors[idx].label = e.target.value;
-                    setLocalUiConfig({ ...localUiConfig, colors: newColors });
+                    setUiConfig({ ...uiConfig, colors: newColors });
                   }} className="bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-sm text-white flex-1" placeholder="Название" />
                   <input type="color" value={col.hex || '#ffffff'} onChange={e => {
-                    const newColors = [...localUiConfig.colors];
+                    const newColors = [...uiConfig.colors];
                     newColors[idx].hex = e.target.value;
-                    setLocalUiConfig({ ...localUiConfig, colors: newColors });
+                    setUiConfig({ ...uiConfig, colors: newColors });
                   }} className="bg-zinc-950 border border-zinc-800 rounded p-0 w-10 h-8 cursor-pointer" title="Выбрать цвет" />
                   <button onClick={() => {
-                    const newColors = localUiConfig.colors.filter((_: any, i: number) => i !== idx);
-                    setLocalUiConfig({ ...localUiConfig, colors: newColors });
+                    const newColors = uiConfig.colors.filter((_: any, i: number) => i !== idx);
+                    setUiConfig({ ...uiConfig, colors: newColors });
                   }} className="p-2 text-red-400 hover:bg-red-400/10 rounded"><Trash2 className="w-4 h-4"/></button>
                 </div>
               ))}
               <button onClick={() => {
                 const newId = 'color_' + Date.now();
-                setLocalUiConfig({
-                  ...localUiConfig,
-                  colors: [...localUiConfig.colors, { id: newId, label: 'Новый цвет', hex: '#ffffff' }]
+                setUiConfig({
+                  ...uiConfig,
+                  colors: [...uiConfig.colors, { id: newId, label: 'Новый цвет', hex: '#ffffff' }]
                 });
               }} className="text-sm text-emerald-400 flex items-center gap-1 mt-2"><Plus className="w-4 h-4"/> Добавить цвет</button>
             </div>
@@ -567,7 +562,6 @@ export function AdminPanel({ config, statsConfig, uiConfig, myCharacters, onSave
         {editingItem && (
           <EditAttributeModal
             item={editingItem.item}
-            uiConfig={localUiConfig}
             onSave={(updatedItem: any) => {
               // Update the item in statsItems or items
               if (activeTab === 'stats') {

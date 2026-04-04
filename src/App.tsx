@@ -15,6 +15,7 @@ import { Toast } from './components/Toast';
 import { AdminPanel } from './components/AdminPanel';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { formatStatValue, formatCustomValue, evaluateFormula } from './utils/formulas';
+import { useStore } from './store/useStore';
 
 const savedToken = localStorage.getItem('session_token');
 if (savedToken) {
@@ -28,40 +29,17 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [showChars, setShowChars] = useState(false);
-  
-  const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  const addToast = React.useCallback((message: string, type: 'success' | 'error' = 'success') => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts(prev => [...prev, { id, message, type }]);
-  }, []);
-
-  const removeToast = React.useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  const handleSaveConfig = async (newConfig: HighlightConfig[], newStatsConfig: StatGroupConfig[], newUiConfig: any) => {
-    try {
-      await axios.post('/api/admin/highlights', newConfig);
-      await axios.post('/api/admin/settings/stats_config', newStatsConfig);
-      await axios.post('/api/admin/settings/ui_config', newUiConfig);
-      setHighlightsConfig(newConfig);
-      setStatsConfig(newStatsConfig);
-      setUiConfig(newUiConfig);
-      addToast('Изменения сохранены');
-    } catch (e) {
-      console.error('Failed to save config', e);
-      addToast('Ошибка при сохранении', 'error');
-    }
-  };
-
-  const [user, setUser] = useState<UserData | null>(null);
-  const [highlightsConfig, setHighlightsConfig] = useState<HighlightConfig[]>([]);
-  const [statsConfig, setStatsConfig] = useState<StatGroupConfig[]>([]);
-  const [uiConfig, setUiConfig] = useState(DEFAULT_UI_CONFIG);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [myCharacters, setMyCharacters] = useState<any[]>([]);
   const popupRef = React.useRef<Window | null>(null);
+
+  const {
+    user, setUser,
+    highlightsConfig, setHighlightsConfig,
+    statsConfig, setStatsConfig,
+    uiConfig, setUiConfig,
+    myCharacters, setMyCharacters,
+    toasts, removeToast
+  } = useStore();
 
   useEffect(() => {
     fetchUser();
@@ -152,10 +130,43 @@ export default function App() {
     try {
       const res = await axios.get('/api/settings/ui_config');
       if (res.data) {
-        setUiConfig(res.data);
+        let config = res.data.value || res.data;
+        if (!config.formats) config.formats = DEFAULT_UI_CONFIG.formats;
+        if (!config.colors) config.colors = DEFAULT_UI_CONFIG.colors;
+        
+        const formats = config.formats.map((fmt: any) => {
+          if (fmt.formula) {
+            let f = fmt.formula;
+            if (f.includes('toLocaleString')) {
+              f = f.replace(/\.toLocaleString\("ru-RU",\s*\{\s*minimumFractionDigits:\s*(\d+),\s*maximumFractionDigits:\s*\d+\s*\}\)/g, '.toFixed($1)');
+              f = f.replace(/\.toLocaleString\("ru-RU",\s*\{\s*maximumFractionDigits:\s*(\d+)\s*\}\)/g, '.toFixed($1)');
+            }
+            if (f.includes('toLocaleDateString')) {
+              f = f.replace(/\.toLocaleDateString\("ru-RU"\)/g, '');
+            }
+            return { ...fmt, formula: f };
+          }
+          let formula = 'x';
+          if (fmt.special === 'duration') formula = 'Math.floor(x / 86400000) + " д. " + Math.floor((x / 3600000) % 24) + " ч."';
+          else if (fmt.special === 'duration_hours') formula = 'Math.floor(x / 3600000)';
+          else if (fmt.special === 'date') formula = 'new Date(x)';
+          else if (fmt.special === 'distance') formula = `(x / 100000).toFixed(${fmt.decimals || 1})`;
+          else if (fmt.id === 'ratio') formula = 'x.toFixed(2)';
+          else if (fmt.id === 'percent') formula = 'x.toFixed(1)';
+          else {
+            if (fmt.multiplier && fmt.multiplier !== 1) formula = `x * ${fmt.multiplier}`;
+            if (fmt.decimals) formula = `(${formula}).toFixed(${fmt.decimals})`;
+          }
+          return { ...fmt, formula };
+        });
+        
+        setUiConfig({ ...config, formats });
+      } else {
+        setUiConfig(DEFAULT_UI_CONFIG);
       }
     } catch (e) {
       console.error('Failed to fetch UI config');
+      setUiConfig(DEFAULT_UI_CONFIG);
     }
   };
 
@@ -365,15 +376,7 @@ export default function App() {
         <AnimatePresence mode="wait">
           {showAdmin && user?.role === 'admin' ? (
             <ErrorBoundary>
-              <AdminPanel 
-                config={highlightsConfig} 
-                statsConfig={statsConfig}
-                uiConfig={uiConfig}
-                myCharacters={myCharacters}
-                onSave={handleSaveConfig} 
-                onClose={() => setShowAdmin(false)}
-                addToast={addToast}
-              />
+              <AdminPanel onClose={() => setShowAdmin(false)} />
             </ErrorBoundary>
           ) : (
             <motion.div

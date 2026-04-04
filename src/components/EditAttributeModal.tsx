@@ -6,6 +6,7 @@ import { cn } from '../utils/cn';
 import { FormulaInput } from './FormulaInput';
 import { evaluateFormula, formatStatValue, formatCustomValue } from '../utils/formulas';
 import { AttributeSidebar } from './AttributeSidebar';
+import { useStore } from '../store/useStore';
 
 export function EditAttributeModal({ 
   item, 
@@ -18,9 +19,9 @@ export function EditAttributeModal({
   setPreviewRegion, 
   attributeSearch, 
   setAttributeSearch, 
-  previewData,
-  uiConfig
+  previewData
 }: any) {
+  const { uiConfig } = useStore();
   const [editedItem, setEditedItem] = useState(item);
   const formulaRef = React.useRef<any>(null);
 
