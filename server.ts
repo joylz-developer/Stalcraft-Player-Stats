@@ -82,7 +82,7 @@ try {
 const pendingAuths = new Map<string, string>();
 
 const requireAuth = (req: any, res: any, next: any) => {
-    let sessionId = req.cookies.session_id;
+    let sessionId = req.cookies.session_token;
     
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -343,10 +343,10 @@ app.get(['/auth/callback', '/api/auth/callback'], async (req, res) => {
             setTimeout(() => pendingAuths.delete(authId), 5 * 60 * 1000);
         }
 
-        res.cookie('session_id', sessionId, { 
+        res.cookie('session_token', sessionId, { 
             httpOnly: true, 
-            secure: true, 
-            sameSite: 'none',
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
             maxAge: 1000 * 60 * 60 * 24 * 7
         });
         
@@ -360,7 +360,7 @@ app.get(['/auth/callback', '/api/auth/callback'], async (req, res) => {
                         <script>
                             try {
                                 if (window.opener) {
-                                    window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS', session_id: '${sessionId}' }, '*');
+                                    window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
                                 }
                             } catch (e) {
                                 console.error('Failed to post message to opener:', e);
@@ -382,7 +382,7 @@ app.get('/api/auth/me', requireAuth, (req: any, res) => {
 });
 
 app.get('/api/user/characters', requireAuth, async (req: any, res) => {
-    let sessionId = req.cookies.session_id;
+    let sessionId = req.cookies.session_token;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
         sessionId = authHeader.substring(7);
@@ -439,11 +439,15 @@ app.get('/api/user/characters', requireAuth, async (req: any, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
-    const sessionId = req.cookies.session_id;
+    const sessionId = req.cookies.session_token;
     if (sessionId) {
         db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
     }
-    res.clearCookie('session_id', { httpOnly: true, secure: true, sameSite: 'none' });
+    res.clearCookie('session_token', { 
+        httpOnly: true, 
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict' 
+    });
     res.json({ success: true });
 });
 

@@ -18,10 +18,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { formatStatValue, formatCustomValue, evaluateFormula } from './utils/formulas';
 import { useStore } from './store/useStore';
 
-const savedToken = localStorage.getItem('session_token');
-if (savedToken) {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
-}
+axios.defaults.withCredentials = true;
 
 export default function App() {
   const [region, setRegion] = useState<Region>('ru');
@@ -69,20 +66,12 @@ export default function App() {
   const { refetch: fetchUser } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
-      if (!localStorage.getItem('session_token')) {
-        setUser(null);
-        return null;
-      }
       try {
         const res = await axios.get('/api/auth/me');
         setUser(res.data);
         return res.data;
       } catch (e) {
         setUser(null);
-        if (axios.isAxiosError(e) && e.response?.status === 401) {
-          localStorage.removeItem('session_token');
-          delete axios.defaults.headers.common['Authorization'];
-        }
         return null;
       }
     }
@@ -95,10 +84,6 @@ export default function App() {
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        if (event.data.session_id) {
-          localStorage.setItem('session_token', event.data.session_id);
-          axios.defaults.headers.common['Authorization'] = `Bearer ${event.data.session_id}`;
-        }
         fetchUser();
         if (popupRef.current) {
           popupRef.current.close();
@@ -222,10 +207,7 @@ export default function App() {
           try {
             const statusRes = await axios.get(`/api/auth/status?auth_id=${encodeURIComponent(authId)}`);
             console.log('Auth status check:', statusRes.data);
-            if (statusRes.data && statusRes.data.success && statusRes.data.session_id) {
-              const token = statusRes.data.session_id;
-              localStorage.setItem('session_token', token);
-              axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+            if (statusRes.data && statusRes.data.success) {
               clearInterval(pollTimer);
               fetchUser();
               try {
@@ -251,8 +233,6 @@ export default function App() {
     } catch (e) {
       console.error('Failed to logout');
     } finally {
-      localStorage.removeItem('session_token');
-      delete axios.defaults.headers.common['Authorization'];
       setUser(null);
       setShowAdmin(false);
     }
