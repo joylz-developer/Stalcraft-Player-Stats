@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Search, User, Shield, Crosshair, Activity, MapPin, Loader2, 
   Target, Skull, Coins, Map, Swords, Home, Trophy, Percent, Clock, Calendar,
-  Settings, LogOut
+  Settings, LogOut, AlertCircle
 } from 'lucide-react';
 import axios from 'axios';
 import { clsx, type ClassValue } from 'clsx';
@@ -25,9 +26,7 @@ if (savedToken) {
 export default function App() {
   const [region, setRegion] = useState<Region>('ru');
   const [nickname, setNickname] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [searchQuery, setSearchQuery] = useState({ region: 'ru', nickname: '' });
   const [showChars, setShowChars] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const popupRef = React.useRef<Window | null>(null);
@@ -41,8 +40,55 @@ export default function App() {
     toasts, removeToast
   } = useStore();
 
+  const { data: profileData, isFetching: loading, isError, error } = useQuery({
+    queryKey: ['profile', searchQuery.region, searchQuery.nickname],
+    queryFn: async () => {
+      const { region, nickname } = searchQuery;
+      if (!nickname.trim()) return null;
+      try {
+        const res = await axios.get(`/api/profile/${region}/${encodeURIComponent(nickname.trim())}`);
+        return res.data;
+      } catch (err: any) {
+        if (err.response?.status === 404) {
+          throw new Error('Игрок не найден. Проверьте никнейм и регион.');
+        }
+        throw new Error(err.response?.data?.message || err.message || 'Произошла ошибка при получении данных.');
+      }
+    },
+    enabled: !!searchQuery.nickname.trim(),
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  });
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (nickname.trim()) {
+      setSearchQuery({ region, nickname: nickname.trim() });
+    }
+  };
+  const { refetch: fetchUser } = useQuery({
+    queryKey: ['user'],
+    queryFn: async () => {
+      if (!localStorage.getItem('session_token')) {
+        setUser(null);
+        return null;
+      }
+      try {
+        const res = await axios.get('/api/auth/me');
+        setUser(res.data);
+        return res.data;
+      } catch (e) {
+        setUser(null);
+        if (axios.isAxiosError(e) && e.response?.status === 401) {
+          localStorage.removeItem('session_token');
+          delete axios.defaults.headers.common['Authorization'];
+        }
+        return null;
+      }
+    }
+  });
+
   useEffect(() => {
-    fetchUser();
     fetchHighlights();
     fetchStatsConfig();
     fetchUiConfig();
@@ -80,25 +126,6 @@ export default function App() {
       console.error('Failed to fetch characters');
       if (axios.isAxiosError(e) && e.response?.status === 401) {
         handleLogout();
-      }
-    }
-  };
-
-  const fetchUser = async () => {
-    // Avoid 401 error on initial load if no token exists
-    if (!localStorage.getItem('session_token')) {
-      setUser(null);
-      return;
-    }
-    try {
-      const res = await axios.get('/api/auth/me');
-      setUser(res.data);
-    } catch (e) {
-      setUser(null);
-      // If 401, clear the invalid token
-      if (axios.isAxiosError(e) && e.response?.status === 401) {
-        localStorage.removeItem('session_token');
-        delete axios.defaults.headers.common['Authorization'];
       }
     }
   };
@@ -228,28 +255,6 @@ export default function App() {
       delete axios.defaults.headers.common['Authorization'];
       setUser(null);
       setShowAdmin(false);
-    }
-  };
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nickname.trim()) return;
-
-    setLoading(true);
-    setError(null);
-    setProfileData(null);
-
-    try {
-      const response = await axios.get(`/api/profile/${region}/${encodeURIComponent(nickname.trim())}`);
-      setProfileData(response.data);
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        setError('Игрок не найден. Проверьте никнейм и регион.');
-      } else {
-        setError(err.response?.data?.message || err.message || 'Произошла ошибка при получении данных.');
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -447,7 +452,7 @@ export default function App() {
               </motion.form>
 
               <AnimatePresence mode="wait">
-                {error && (
+                {isError && (
                   <motion.div
                     key="error"
                     initial={{ opacity: 0, y: 10 }}
@@ -456,7 +461,7 @@ export default function App() {
                     className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 text-red-400 mb-8 max-w-4xl mx-auto"
                   >
                     <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
-                    <p>{error}</p>
+                    <p>{error instanceof Error ? error.message : 'Произошла ошибка'}</p>
                   </motion.div>
                 )}
 
