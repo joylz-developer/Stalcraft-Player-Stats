@@ -336,8 +336,8 @@ export function AdminPanel({ onClose }: { onClose: () => void }) {
           <div className="flex-1 space-y-4">
             {activeTab === 'highlights' && (
               <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-                <SortableContext items={items.map(i => i.id as string)} strategy={verticalListSortingStrategy}>
-                  <div className="space-y-4 pr-2">
+                <SortableContext items={items.map(i => i.id as string)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pr-2">
                     {items.map((item, idx) => (
                       <SortableHighlightItem
                         key={item.id}

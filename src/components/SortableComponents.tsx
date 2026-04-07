@@ -174,7 +174,7 @@ export function SortableHighlightItem({ item, idx, updateItem, removeItem, setFo
   const displayVal = formatCustomValue(previewValue, item.format, uiConfig.formats, item.roundToK !== false);
   const colorObj = uiConfig.colors.find((c: any) => c.id === item.color);
   const hexColor = colorObj ? colorObj.hex : undefined;
-  const legacyBgClass = !colorObj && item.color ? item.color.replace('text-', 'bg-') : 'bg-white';
+  const legacyColorClass = !colorObj ? item.color : undefined;
 
   return (
     <div 
@@ -185,28 +185,21 @@ export function SortableHighlightItem({ item, idx, updateItem, removeItem, setFo
         window.getSelection()?.removeAllRanges();
         onEditItem(item, null, idx);
       }}
-      className="bg-zinc-950 border border-zinc-800 rounded-2xl p-4 flex flex-col md:flex-row gap-4 items-center cursor-pointer hover:border-zinc-700 transition-colors relative group/hl select-none"
+      className="bg-zinc-950/50 border border-zinc-800/50 rounded-2xl p-4 text-center cursor-pointer hover:border-zinc-700 transition-colors relative group/hl select-none"
     >
       {isEditMode && (
-        <div {...attributes} {...listeners} className="absolute left-2 opacity-0 group-hover/hl:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity bg-zinc-900/80 p-1 rounded backdrop-blur-sm z-10">
-          <GripVertical className="w-5 h-5" />
+        <div {...attributes} {...listeners} className="absolute top-2 left-2 opacity-0 group-hover/hl:opacity-100 cursor-grab text-zinc-500 hover:text-white touch-none transition-opacity bg-zinc-900/80 p-1 rounded backdrop-blur-sm z-10">
+          <GripVertical className="w-4 h-4" />
         </div>
       )}
       
-      <div className="flex-1 flex items-center justify-between w-full pl-6 pr-8">
-        <div className="flex items-center gap-4">
-          <div className={cn("w-3 h-3 rounded-full", hexColor ? "" : legacyBgClass)} style={hexColor ? { backgroundColor: hexColor } : {}} />
-          <span className="text-zinc-300 font-medium">{item.title || 'Без названия'}</span>
-        </div>
-        <div className="text-zinc-500 font-mono text-xs break-words max-w-[200px] text-right">
-          {displayVal}
-        </div>
-      </div>
+      <div className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-1">{item.title || 'Без названия'}</div>
+      <div className={cn("text-2xl font-bold", hexColor ? "" : legacyColorClass)} style={hexColor ? { color: hexColor } : {}}>{displayVal}</div>
 
       {isEditMode && (
         <button 
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); removeItem(idx); }} 
-          className="absolute right-4 p-2 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors opacity-0 group-hover/hl:opacity-100"
+          className="absolute top-2 right-2 p-1 text-zinc-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors opacity-0 group-hover/hl:opacity-100"
         >
           <Trash2 className="w-4 h-4" />
         </button>
